@@ -2,9 +2,9 @@ import can
 import threading
 import time
 
-class PumpController:
-    def __init__(self, channel=0, bitrate=500000):
-        self.bus = can.interface.Bus(interface='vector', app_name='CANalyzer', channel=channel, bitrate=bitrate, receive_own_messages=True)
+class Cantroller:
+    def __init__(self):
+        
         
         # Default values
         self.bcm_power = 0
@@ -14,6 +14,14 @@ class PumpController:
         self.running = False
         self.bcm_thread = None
         self.pump2_thread = None
+    
+    def connect_to_instance(self, channel=0, bitrate=500000):
+        try:
+            self.bus = can.interface.Bus(interface='vector', app_name='CANalyzer', channel=channel, bitrate=bitrate, receive_own_messages=True)
+            return True
+        except can.CanInitializationError:
+            print("Could not connect to CANBUS")
+            return False
 
     def encode_signal(self, value, scale, min_val, max_val):
         raw_value = int(value / scale)
@@ -29,7 +37,7 @@ class PumpController:
 
     def _send_pump2_command(self):
         while self.running:
-            raw_value = self.encode_signal(self.pump2_power, 0.5, 0, 125)
+            raw_value = self.encode_signal(self.pump2_power, 0.5, 0, 200)
             data = [0x05, 0, 0, raw_value, 0, 0, 0, 0]
             message = can.Message(arbitration_id=0x18EF01FE, data=data, is_extended_id=True, is_rx=False)
             self.bus.send(message)
@@ -45,12 +53,18 @@ class PumpController:
 
     def stop(self):
         self.running = False
-        if self.bcm_thread:
-            self.bcm_thread.join()
-        if self.pump2_thread:
-            self.pump2_thread.join()
+        # Allow threads to exit cleanly without forcing join()
+        if self.bcm_thread and self.bcm_thread.is_alive():
+            self.bcm_thread.join(timeout=1)
+        if self.pump2_thread and self.pump2_thread.is_alive():
+            self.pump2_thread.join(timeout=1)
 
+    def shutdown(self):
+        """Stops all CAN operations and ensures a clean shutdown."""
+        self.stop()  # Stop ongoing transmissions
         self.bus.shutdown()
+        print("CAN bus shutdown complete.")
+
 
     def set_bcm_power(self, value):
         self.bcm_power = value
@@ -61,7 +75,8 @@ class PumpController:
         print(f"Updated PUMP2 Motor Speed Command to {value}%")
 
 if __name__ == '__main__':
-    controller = PumpController()
+    controller = Cantroller()
+    controller.connect_to_instance()
     controller.start()
 
     time.sleep(5)
