@@ -1,5 +1,6 @@
 import sys
 import os
+import serial
 import csv
 import pyqtgraph as pg
 import numpy as np
@@ -11,6 +12,8 @@ from PySide6.QtWidgets import (QApplication, QGroupBox, QPushButton, QLayout, QM
                                QHBoxLayout, QWidget, QDoubleSpinBox, QGridLayout)
 from flexlogger_lib import FlexLoggerInterface
 from can_controller_lib import Cantroller
+from julabo_lib import JULABO
+from timer_lib import PausableTimer
 
 
 class PumpControlApp(QMainWindow):
@@ -36,7 +39,7 @@ class PumpControlApp(QMainWindow):
         # Declare connections
         self.flexlogger_connected = False
         self.canalyzer_connected = False
-        self.easytemp_connected = False
+        self.julabo_connected = False
 
         # Declare variables 
         self.total_period = 0.0
@@ -82,8 +85,8 @@ class PumpControlApp(QMainWindow):
         self._canalyzer_button = self.create_button("Connect CANalyzer", self.connect_canalyzer)
         self._canalyzer_conn_status = self.create_connection_status_label(self.canalyzer_connected)
 
-        self._easytemp_button = self.create_button("Connect EasyTemp", self.connect_easytemp)       
-        self._easytemp_conn_status = self.create_connection_status_label(self.easytemp_connected) 
+        self._julabo_button = self.create_button("Connect julabo", self.connect_julabo)       
+        self._julabo_conn_status = self.create_connection_status_label(self.julabo_connected) 
 
         self.graph_1 = self.create_graph("Temperature Cycles", "Hour", "Temperature (C)")
         self.graph_2 = self.create_graph("Pressure", "Hour", "Pressure(PSI)")
@@ -120,8 +123,8 @@ class PumpControlApp(QMainWindow):
         self.conn_layout.addWidget(self._flexlogger_conn_status, 1, 1)
         self.conn_layout.addWidget(self._canalyzer_button, 2, 0)
         self.conn_layout.addWidget(self._canalyzer_conn_status, 2, 1)
-        self.conn_layout.addWidget(self._easytemp_button, 3, 0)
-        self.conn_layout.addWidget(self._easytemp_conn_status, 3, 1)
+        self.conn_layout.addWidget(self._julabo_button, 3, 0)
+        self.conn_layout.addWidget(self._julabo_conn_status, 3, 1)
         self.conn_layout.addWidget(self.graph_1, 4, 0)
         self.conn_layout.addWidget(self.graph_2, 4, 1)
         self.col2_layout.addLayout(self.conn_layout)
@@ -337,6 +340,25 @@ class PumpControlApp(QMainWindow):
         setattr(self, var_name, state == 2)
         print(f"{var_name}: {state}")
 
+    def dialogue_ok_box(self, win_title, message):
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle(win_title)
+        dlg.setText(message)
+        button = dlg.exec()
+
+    def dialogue_yes_no_box(self, win_title, message):
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle(win_title)
+        dlg.setText(message)
+        dlg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        dlg.setIcon(QMessageBox.Question)
+        button = dlg.exec()
+        
+        if button == QMessageBox.Yes:
+            return True
+        else:
+            return False
+
     def create_button(self, label, callback):
         """Create a button"""
         button = QPushButton(label)
@@ -386,9 +408,26 @@ class PumpControlApp(QMainWindow):
         else:
             self.dialogue_ok_box("Connection Error", "Could not connect to CANBUS!")
 
-    def connect_easytemp(self):
-        print("connecting easytemp")
-    
+    def connect_julabo(self):
+        print("connecting julabo")
+        try:
+            self._julabo = JULABO('COM4', baud=4800)
+            self.julabo_connected = True
+        except serial.SerialException:
+            print("Error: Could not open COM4.")
+            self.julabo_connected = False
+
+        if self.julabo_connected:
+            # Update UI status
+            new_status_label = QLabel("Connected" if self.julabo_connected else "Not Connected")
+
+            self.conn_layout.removeWidget(self._julabo_conn_status)
+            self._julabo_conn_status.deleteLater()
+            self._julabo_conn_status = new_status_label
+            self.conn_layout.addWidget(self._julabo_conn_status, 3, 1)
+        else:
+            self.dialogue_ok_box("Connection Error", "Could not connect to julabo!")
+
     def create_connection_status_label(self, conn_bool):
         conn_status = QLabel("")
         if conn_bool:
@@ -445,7 +484,12 @@ class PumpControlApp(QMainWindow):
 
             # Deactivate and reset test
             self._test_active = False
-            self.cycle_count_num = 0
+            self.pressure_cycle_count = 0
+            self.fluid_cycle_count = 0
+            self.chamber_cycle_count = 0
+
+            # Initialize fluid cycling timer
+            self._fluid_timer = PausableTimer(self.fluid_period, self.set_julabo_temperature)
 
             # Clear both graphs and reset the range
             self.graph_1.clear()
@@ -468,6 +512,7 @@ class PumpControlApp(QMainWindow):
                 x, y = self.calculate_period(self.chamber_period, self.chamber_min_temp, self.chamber_max_temp)
                 self.plot(self.graph_1,x, y, "chamber temperature", 'k', self.plot_width_1)
 
+            # LOGGING
             if self.logging_enabled:
                 self.create_log_file(self.log_file_name)
 
@@ -577,34 +622,38 @@ class PumpControlApp(QMainWindow):
         if not self.canalyzer_connected:
             self.dialogue_ok_box("Warning", "CANBUS not connected!")
             return
+        
+        if not self.julabo_connected:
+            self.dialogue_ok_box("Warning", "JULABO not connected!")
+            return
 
         if self.profile_generated:
             print("Starting test")
-            self._test_active = True  # Enable test flag
+            # Activate test bool
+            self._test_active = True 
 
-            self.p_timer = QTimer(self)
+            # Updating live curve
+            self.p_timer = QTimer(self) # Initialize timer 
             self.p_timer.timeout.connect(self.update_curve)
             self.p_timer.start(self.timer_ms)
 
-            # Run the test in a separate thread so GUI remains responsive
-            self.test_thread = threading.Thread(target=self.run_test, daemon=True)
+            # Run pressure profile            
+            self.test_thread = threading.Thread(target=self.run_pump_profile, daemon=True) # This is in separate thread to allow for GUI interaction
             self.test_thread.start()
+
 
         else:
             self.dialogue_ok_box("Warning", "Profile not generated!")
 
     def pause_test(self):
         """(STATIC) Disables test active bool"""
+        # Disable test bool
         self._test_active = False
-        print("pause_test")
-            
+        print("pausing test")
+        # Stops the pressure profile (does not reset pressure_cycle_count)
         if hasattr(self, "test_thread") and self.test_thread.is_alive():
             self.test_thread.join()  # Ensure the test thread stops cleanly
-
-        self._cantroller.set_bcm_power(0)
-        self._cantroller.set_pump2_power(0)
-        self._cantroller.stop()
-        print("Test stopped.")
+        print("test paused")
 
     def test_case(self):
         self.total_period = 216
@@ -615,7 +664,7 @@ class PumpControlApp(QMainWindow):
         self.chamber_period = 16
         self.chamber_max_temp = 30
         self.pressure_cycle_enable = True
-        self.pressure_num_cycles = 10
+        self.pressure_num_cycles = 5
         self.pressure_max_psi = 35
         self.pressure_min_psi = 15
 
@@ -629,37 +678,18 @@ class PumpControlApp(QMainWindow):
             self._flexlogger_conn_status = new_flex_status
             self.conn_layout.addWidget(self._flexlogger_conn_status, 1, 1)
 
-    def dialogue_ok_box(self, win_title, message):
-        dlg = QMessageBox(self)
-        dlg.setWindowTitle(win_title)
-        dlg.setText(message)
-        button = dlg.exec()
-
-    def dialogue_yes_no_box(self, win_title, message):
-        dlg = QMessageBox(self)
-        dlg.setWindowTitle(win_title)
-        dlg.setText(message)
-        dlg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        dlg.setIcon(QMessageBox.Question)
-        button = dlg.exec()
-        
-        if button == QMessageBox.Yes:
-            return True
-        else:
-            return False
-
     def create_log_file(self, name):
         """Creates a CSV file with a timestamped header including sensor names."""
         sensors = self._flex.get_sensor_list()  # Get list of sensor names
         self.curr_filename = self.get_timestamp() + "_" + name
         with open(self.curr_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["timestamp"] + sensors)  # Write header row once
+            writer.writerow(["timestamp"] + ["cycle_count"] + sensors)  # Write header row once
         print(f"Log file '{self.curr_filename}' created successfully.")
 
     def update_log_file(self):
         """(DYNAMIC) Updates CSV file with values"""
-        curr_data = [self.get_timestamp()]  # Start with timestamp as first element
+        curr_data = [self.get_timestamp()] + [self.pressure_cycle_count] # Start with timestamp as first element
 
         # Extract the latest values from each sensor and append them
         for sen, data in self.sensor_data.items():
@@ -670,16 +700,18 @@ class PumpControlApp(QMainWindow):
             writer = csv.writer(file)
             writer.writerow(curr_data)  # Write row with timestamp + sensor values
 
-    def run_test(self):
+    def run_pump_profile(self):
         """Runs the test loop, cycling pumps on and off while test is active."""
         self._cantroller.start()
+        self._julabo.set_power_on()
+        self._fluid_timer.start()
         # Initial sequence to let test warm up
-        if self._test_active and not self.test_error_bool and self.cycle_count_num < self.pressure_num_cycles:
+        if self._test_active and not self.test_error_bool and self.pressure_cycle_count < self.pressure_num_cycles:
             self._cantroller.set_bcm_power(60)
             self._cantroller.set_pump2_power(60)
             time.sleep(2)
 
-        while self._test_active and self.cycle_count_num < self.pressure_num_cycles:
+        while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
             self._cantroller.set_bcm_power(83)
             self._cantroller.set_pump2_power(83)
             time.sleep(4)
@@ -688,10 +720,47 @@ class PumpControlApp(QMainWindow):
             self._cantroller.set_pump2_power(0)
             time.sleep(1)  
 
-            self.cycle_count_num += 1
-            self._cycle_count_title.setTitle(f"Cycle Count: {self.cycle_count_num}/{self.pressure_num_cycles}")
+            self.pressure_cycle_count += 1
+            self._cycle_count_title.setTitle(f"Cycle Count: {self.pressure_cycle_count}/{self.pressure_num_cycles}")
 
-        self._cantroller.stop()  # Ensure pumps turn off when exiting
+        # PAUSING ACTIVITY
+        if self.pressure_cycle_count < self.pressure_num_cycles:
+            self._cantroller.stop()
+            self._fluid_timer.pause()
+            self._julabo.set_power_off()
+            
+        # PUMP PROFILE FINISHED
+        else:
+            time.sleep(5) # Allow time for clean log finish
+            self._test_active = False
+            self.stop_test()
+            print("pressure_profile_finished")
+
+    def set_julabo_temperature(self):
+        """Function to change temperature of fluid in julabo based on even/odd (called at end of timer)"""
+        if self.fluid_cycle_count % 2 == 0:
+            self._julabo.set_work_temperature(self.fluid_max_temp)
+            print(f"set julabo temp to max_temp: {self.fluid_max_temp}")
+        else: 
+            self._julabo.set_work_temperature(self.fluid_min_temp)
+            print(f"set julabo temp to min_temp: {self.fluid_min_temp} ")
+
+        self.fluid_cycle_count+=1
+
+    def stop_test(self):
+        self._fluid_timer.stop()
+        print("1")
+        self._julabo.set_power_off()
+        print("2")
+        self._cantroller.stop()
+        print("3")
+
+    def closeEvent(self, event):
+        """Override to cleanly stop the timer on window close."""
+        self.stop_test()
+        self._julabo.close()
+        self._cantroller.shutdown()
+        event.accept()  # Proceed with window closing
 
 
 if __name__ == "__main__":
