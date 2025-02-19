@@ -25,25 +25,21 @@ class PumpControlApp(QMainWindow):
                                                      
     def test_case(self):
         self.total_period = 216
-        self.fluid_cycle_enable = True
-        self.fluid_period = 10 
-        self.fluid_max_temp = 30
-        self.chamber_cycle_enable = True
-        self.chamber_period = 16
-        self.chamber_max_temp = 30
-        self.pressure_cycle_enable = True
-        self.pressure_num_cycles = 5
+        self.fluid_period = 12 
+        self.fluid_min_temp = -20
+        self.fluid_max_temp = 40
+        self.chamber_period = 13.5
+        self.chamber_min_temp = -20
+        self.chamber_max_temp = 60
+        self.pressure_num_cycles = 444000
         self.pressure_max_psi = 35
-        self.pressure_min_psi = 15
+        self.pressure_min_psi = 0
 
     def initialize(self):
         self.setWindowTitle("Manifold Durability Cyclic Pressure Test")
         self.setGeometry(100, 100, 600, 200)
         
         # Declare enables
-        self.fluid_cycle_enable = False
-        self.chamber_cycle_enable = False
-        self.pressure_cycle_enable = False
         self._test_active = False
         self.profile_generated = False
         self.logging_enabled = False
@@ -182,7 +178,7 @@ class PumpControlApp(QMainWindow):
         # Set column 3 size
         self.col3_widget = QWidget()
         self.col3_widget.setLayout(self.col3_layout)
-        self.col3_widget.setFixedWidth(200)
+        self.col3_widget.setFixedWidth(220)
         # Set widget heights
         # Col1
         self._test_param_title.setFixedHeight(30)
@@ -241,12 +237,6 @@ class PumpControlApp(QMainWindow):
         layout.addWidget(QLabel("max temp (°C)"), 3, 0)
         layout.addWidget(max_temp, 3, 1)
 
-        # Create enable checkbox
-        checkbox = QCheckBox('enable', self)
-        checkbox.setChecked(False)
-        checkbox.stateChanged.connect(lambda state: self.update_boolean('fluid_cycle_enable', state))
-        layout.addWidget(checkbox)
-
         self._fluid_cycle_box.setLayout(layout)
 
     def create_chamber_cycle_box(self):
@@ -278,12 +268,6 @@ class PumpControlApp(QMainWindow):
         layout.addWidget(QLabel("max temp (°C)"), 3, 0)
         layout.addWidget(max_temp, 3, 1)
 
-        # Create enable checkbox
-        checkbox = QCheckBox('enable', self)
-        checkbox.setChecked(False)
-        checkbox.stateChanged.connect(lambda state: self.update_boolean('chamber_cycle_enable', state))
-        layout.addWidget(checkbox)
-
         self._chamber_cycle_box.setLayout(layout)
 
     def create_pressure_cycle_box(self):
@@ -294,7 +278,7 @@ class PumpControlApp(QMainWindow):
         # Create cycle input in number of cycles
         cycle_input = QDoubleSpinBox(self)
         cycle_input.setSingleStep(0.25)
-        cycle_input.setMaximum(99999.99)
+        cycle_input.setMaximum(999999.99)
         cycle_input.valueChanged.connect(lambda value: self.update_variable("pressure_num_cycles", value))
         layout.addWidget(cycle_input, 1, 0)
         layout.addWidget(QLabel("cycles"), 1, 1)
@@ -312,12 +296,6 @@ class PumpControlApp(QMainWindow):
         max_psi.valueChanged.connect(lambda value: self.update_variable("pressure_max_psi", value))
         layout.addWidget(QLabel("max PSI"), 3, 0)
         layout.addWidget(max_psi, 3, 1)
-
-        # Create enable checkbox
-        checkbox = QCheckBox('enable', self)
-        checkbox.setChecked(False)
-        checkbox.stateChanged.connect(lambda state: self.update_boolean('pressure_cycle_enable', state))
-        layout.addWidget(checkbox)
 
         self._pressure_cycle_box.setLayout(layout)
 
@@ -458,15 +436,27 @@ class PumpControlApp(QMainWindow):
             self.conn_layout.addWidget(self._canbus_conn_status, 2, 1)
         else:
             self.create_dialogue_ok_box("Connection Error", "Could not connect to CANBUS!")
-
+    
     def connect_julabo(self):
-        print("connecting julabo")
+        """Attempt to connect and verify communication with Julabo."""
+        print("Connecting to Julabo...")
+
         try:
             self._julabo = JULABO('COM4', baud=4800)
-            self.julabo_connected = True
+
+            # Test if communication works
+            response = self._julabo.get_version()
+            if response:
+                print(f"Julabo connected! Version: {response}")
+                self.julabo_connected = True
+            else:
+                print("Error: Julabo did not respond.")
+                self.julabo_connected = False
+
         except serial.SerialException:
             print("Error: Could not open COM4.")
             self.julabo_connected = False
+
 
         if self.julabo_connected:
             # Update UI status
@@ -528,12 +518,10 @@ class PumpControlApp(QMainWindow):
             self.fluid_cycle_count = 0
             self.chamber_cycle_count = 0
             self.pressure_drop_count = 0 # For pressure drop check
-            self.last_fluid_timestamp = 0
-            self.last_chamber_timestamp = 0
 
             # Initialize fluid cycling timer
-            self._fluid_timer = PausableTimer(self.fluid_period, self.set_julabo_temp)
-            self._chamber_timer = PausableTimer(self.chamber_period, self.set_chamber_temp)
+            self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
+            self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
 
             # Clear both graphs and reset the range
             self._graph_1.clear()
@@ -549,12 +537,11 @@ class PumpControlApp(QMainWindow):
                 self.sensor_data[sen]["time_counter"] = 0
 
             # Plot profiles
-            if self.fluid_cycle_enable:
-                x, y, self.fluid_num_cycles = self.calculate_period(self.fluid_period, self.fluid_min_temp, self.fluid_max_temp)
-                self.plot(self._graph_1,x, y, "fluid temperature", 'm', self.plot_width_1)
-            if self.chamber_cycle_enable:
-                x, y, self.chamber_num_cycles = self.calculate_period(self.chamber_period, self.chamber_min_temp, self.chamber_max_temp)
-                self.plot(self._graph_1,x, y, "chamber temperature", 'k', self.plot_width_1)
+            x, y, self.fluid_num_cycles = self.calculate_period(self.fluid_period, self.fluid_min_temp, self.fluid_max_temp)
+            self.plot(self._graph_1,x, y, "fluid temperature", 'm', self.plot_width_1)
+
+            x, y, self.chamber_num_cycles = self.calculate_period(self.chamber_period, self.chamber_min_temp, self.chamber_max_temp)
+            self.plot(self._graph_1,x, y, "chamber temperature", 'k', self.plot_width_1)
 
             # Update cycle labels
             self.pressure_cycle_count_label.setText(f"Pressure Cycle Count: {self.pressure_cycle_count}/{self.pressure_num_cycles}")
@@ -657,22 +644,18 @@ class PumpControlApp(QMainWindow):
                     # inlet pressure drop check
                     if "psi" in sensor.lower() and "inlet" in sensor.lower():
                         curr_pressure = new_value # Sets current value to sensor reading
-                        if curr_pressure < self.pressure_max_psi: # if current pressure < max psi add to count
+                        if curr_pressure < self.pressure_max_psi - 5: # if current pressure < max psi add to count -5 for range
                             self.pressure_drop_count +=1
                         else:                                     # if not, reset count
                             self.pressure_drop_count = 0
                         
-                        print(f"pressure drop count: {self.pressure_drop_count}")
-                        if self.pressure_drop_count > 100:
+                        #print(f"pressure drop count: {self.pressure_drop_count}") # Debug statement
+                        if self.pressure_drop_count > 10:
                             print("Pressure drop detected, test paused")
                             self._test_active = False
-                            self.create_dialogue_ok_box("Test Error", "Pressure drop detected, test paused")
                             self.create_crash_file()
-  
-
-
-
-                    
+                            self.create_dialogue_ok_box("Test Error", "Pressure drop detected, test paused")
+                            
 
             except ValueError:
                 print(f"Warning: Non-numeric value received for {sensor}: {new_value}")
@@ -724,25 +707,27 @@ class PumpControlApp(QMainWindow):
         if hasattr(self, "test_thread") and self.test_thread.is_alive():
             self.test_thread.join()  # Ensure the test thread stops cleanly
         print("test paused")
+        self.create_dialogue_ok_box("Test Status", "Test paused!")
     
     def create_crash_file(self):
         """"(STATIC) Create a file with status of test on crash as a backup"""
-        crash_time = self.get_timestamp()
+        # Get crash timestamp and float(time)
+        crash_timestamp = self.get_timestamp()
+        crash_time = time.time()
 
         # Create crash file
-        self.curr_filename = crash_time + "_Crash"
-        with open(self.curr_filename, mode='w', newline='') as file:
+        self.crash_filename = crash_timestamp + "_Crash"
+        with open(self.crash_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["pressure_cycle_count", "fluid_cycle_count", "fluid_cycle_remaining_seconds", "chamber_cycle_count", "chamber_cycle_remaining_seconds"])
 
         # Fill crash file with remaining status
-        data = [self.pressure_cycle_count] + [self.fluid_cycle_count] + [crash_time - self.last_fluid_timestamp] + [self.chamber_cycle_count] + [crash_time-self.last_chamber_timestamp]
-        with open(self.curr_filename, mode='a', newline='') as file:  # Use 'a' (append mode)
+        data = [self.pressure_cycle_count] + [self.fluid_cycle_count] + [crash_time - self.last_fluid_time] + [self.chamber_cycle_count] + [crash_time-self.last_chamber_time]
+        with open(self.crash_filename, mode='a', newline='') as file:  # Use 'a' (append mode)
             writer = csv.writer(file)
             writer.writerow(data)  # Write row with timestamp + sensor values
 
-        print(f"Crash file '{self.curr_filename}' created successfully.")
-
+        print(f"Crash file '{self.crash_filename}' created successfully.")
 
     def create_log_file(self, name):
         """(STATIC) Creates a CSV file with a timestamped header including sensor names."""
@@ -771,6 +756,8 @@ class PumpControlApp(QMainWindow):
         self._cantroller.start()
         self._julabo.set_power_on()
         self._fluid_timer.start()
+        self._chamber_timer.start()
+        
         # Initial sequence to let test warm up
         if self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
             self._cantroller.set_bcm_power(60)
@@ -780,7 +767,7 @@ class PumpControlApp(QMainWindow):
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
             self._cantroller.set_bcm_power(83)
             self._cantroller.set_pump2_power(83)
-            time.sleep(4)
+            time.sleep(4.27)
 
             self._cantroller.set_bcm_power(0)
             self._cantroller.set_pump2_power(0)
@@ -793,19 +780,19 @@ class PumpControlApp(QMainWindow):
         if self.pressure_cycle_count < self.pressure_num_cycles:
             self._cantroller.stop()
             self._fluid_timer.pause()
+            self._chamber_timer.pause()
             self._julabo.set_power_off()
-            
         # PUMP PROFILE FINISHED
         else:
             time.sleep(5) # Allow time for clean log finish
             self._test_active = False
             self.stop_test()
-            self.create_dialogue_ok_box("Test Status", "Test is completed!")
+            #self.create_dialogue_ok_box("Test Status", "Test is completed!")
             print("pressure_profile_finished")
 
     def set_julabo_temp(self):
         """(DYNAMIC) Function to change temperature of fluid in julabo based on even/odd (called at end of timer)"""
-        self.last_fluid_timestamp = self.get_timestamp()
+        self.last_fluid_time = time.time()
 
         if self.fluid_cycle_count % 2 == 0:
             self._julabo.set_work_temperature(self.fluid_max_temp)
@@ -819,20 +806,28 @@ class PumpControlApp(QMainWindow):
 
     def set_chamber_temp(self):
         """(DYNAMIC) Filler for logging chamber cycle status"""
-        self.last_chamber_timestamp = self.get_timestamp()
+        self.last_chamber_time = time.time()
         self.chamber_cycle_count+=1
+        self.chamber_cycle_count_label.setText(f"Chamber Cycle Count: {self.chamber_cycle_count}/{self.chamber_num_cycles}")
+        
 
     def stop_test(self):
         """(STATIC) Stop moving components of test"""
+        print("hi")
         if self.julabo_connected:
             self._fluid_timer.stop()
+            print("hi")
             self._julabo.set_power_off()
         if self.canbus_connected:
+            print("hi")
             self._cantroller.stop()
+            print("hi")
+        self._chamber_timer.stop()
 
     def closeEvent(self, event):
         """(STATIC) Override to cleanly stop the timer on window close"""
-        self.stop_test()
+        if self._test_active:
+            self.stop_test()
         if self.julabo_connected:
             self._julabo.close()
         if self.canbus_connected:

@@ -12,10 +12,13 @@ class PausableTimer:
 
     def start(self):
         """Start or resume the timer."""
+        print("start")
         if self.paused:  # If resuming
             self.paused = False
         else:  # If starting fresh
             self.remaining_time = self.interval  
+            print("function")
+            self.function()
 
         self.start_time = time.time()
         self.timer = threading.Timer(self.remaining_time, self._execute)
@@ -24,19 +27,22 @@ class PausableTimer:
         print(f"remaining time: {self.remaining_time}")
 
     def _execute(self):
-        """Execute the function and restart the timer."""
-        self.function()
-        self.start()  # Restart the timer after execution
+        """Execute the function and restart the timer unless stopped."""
+        if not self.paused and self.timer:  # Ensure the timer is still active
+            self.function()
+            if self.timer:  # Check again before restarting
+                self.start()  # Restart the timer
+
 
     def pause(self):
         """Pause the timer and store remaining time."""
         if self.timer:
             self.timer.cancel()
             elapsed_time = time.time() - self.start_time
-            print(f"elapsed time: {elapsed_time}")
+            #print(f"elapsed time: {elapsed_time}")
             self.remaining_time -= elapsed_time
             self.paused = True
-            print(f"remaining time: {self.remaining_time}")
+            #print(f"remaining time: {self.remaining_time}")
 
     def resume(self):
         """Resume the timer with the remaining time."""
@@ -47,8 +53,10 @@ class PausableTimer:
         """Completely stop the timer."""
         if self.timer:
             self.timer.cancel()
+            self.timer = None  # Ensure the timer reference is removed
         self.remaining_time = self.interval
         self.paused = False
+        print("test stopped")
 
 if __name__ == "__main__":
 

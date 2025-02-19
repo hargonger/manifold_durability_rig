@@ -69,6 +69,10 @@ class JULABO():
 		logging.debug(f"Response from unit: {response_str}")
 
 		return response_str
+	
+	def get_version(self):
+		"""Get the Julabo software version."""
+		return self.send_command("version")
 
 
 
