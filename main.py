@@ -650,7 +650,7 @@ class PumpControlApp(QMainWindow):
                             self.pressure_drop_count = 0
                         
                         #print(f"pressure drop count: {self.pressure_drop_count}") # Debug statement
-                        if self.pressure_drop_count > 10:
+                        if self.pressure_drop_count > 100:
                             print("Pressure drop detected, test paused")
                             self._test_active = False
                             self.create_crash_file()
@@ -722,7 +722,7 @@ class PumpControlApp(QMainWindow):
             writer.writerow(["pressure_cycle_count", "fluid_cycle_count", "fluid_cycle_remaining_seconds", "chamber_cycle_count", "chamber_cycle_remaining_seconds"])
 
         # Fill crash file with remaining status
-        data = [self.pressure_cycle_count] + [self.fluid_cycle_count] + [crash_time - self.last_fluid_time] + [self.chamber_cycle_count] + [crash_time-self.last_chamber_time]
+        data = [self.pressure_cycle_count] + [self.fluid_cycle_count] + [(self.fluid_period*3600) - (crash_time - self.last_fluid_time)] + [self.chamber_cycle_count] + [(self.chamber_period*3600) - (crash_time - self.last_chamber_time)]
         with open(self.crash_filename, mode='a', newline='') as file:  # Use 'a' (append mode)
             writer = csv.writer(file)
             writer.writerow(data)  # Write row with timestamp + sensor values
@@ -772,6 +772,8 @@ class PumpControlApp(QMainWindow):
             self._cantroller.set_bcm_power(0)
             self._cantroller.set_pump2_power(0)
             time.sleep(1)  
+
+            #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
 
             self.pressure_cycle_count += 1
             self.pressure_cycle_count_label.setText(f"Pressure Cycle Count: {self.pressure_cycle_count}/{self.pressure_num_cycles}")
