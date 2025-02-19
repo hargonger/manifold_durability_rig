@@ -7,7 +7,7 @@ import numpy as np
 import time
 import threading
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import (QApplication, QGroupBox, QPushButton, QLayout, QMessageBox,
+from PySide6.QtWidgets import (QApplication, QGroupBox, QPushButton, QDialog, QMessageBox,
                                QMainWindow, QLabel, QVBoxLayout,QCheckBox, QLineEdit,
                                QHBoxLayout, QWidget, QDoubleSpinBox, QGridLayout)
 from flexlogger_lib import FlexLoggerInterface
@@ -48,6 +48,7 @@ class PumpControlApp(QMainWindow):
         self.profile_generated = False
         self.logging_enabled = False
         self.test_case_enabled = False
+        self.resume_cycle_enabled = False
 
         # Declare connections
         self.flexlogger_connected = False
@@ -108,13 +109,14 @@ class PumpControlApp(QMainWindow):
         self._graph_1 = self.create_graph("Temperature Cycles", "Hour", "Temperature (C)")
         self._graph_2 = self.create_graph("Pressure", "Hour", "Pressure(PSI)")
         self._start_resume_button = self.create_button("START/RESUME", self.start_test)
-        self._pause_stop__button = self.create_button("TEMP PAUSE", self.pause_test)  
+        self._pause_stop_button = self.create_button("TEMP PAUSE", self.pause_test)  
 
         # Column 3 widgets
         self._live_status_title = self.create_title_label("LIVE STATUS")
         self.create_cycle_count_box()
         self.create_logging_widgets()
         self.create_test_widget()
+        self._resume_cycle_button = self.create_button("RESUME FROM CYCLES", self.resume_cycle_entry)
 
         # Widget depending on connection
         if self.flexlogger_connected:
@@ -149,15 +151,17 @@ class PumpControlApp(QMainWindow):
         self.col2_layout.addLayout(self.conn_layout)
         self.button_layout = QGridLayout()
         self.button_layout.addWidget(self._start_resume_button, 1, 0)
-        self.button_layout.addWidget(self._pause_stop__button, 1, 1)
+        self.button_layout.addWidget(self._pause_stop_button, 1, 1)
         self.col2_layout.addLayout(self.button_layout)
 
         # Column 3 Layout
         self.col3_layout = QVBoxLayout()
         self.col3_layout.addWidget(self._live_status_title)
         self.col3_layout.addWidget(self._cycle_count_box)
-        self.col3_layout.addWidget(self._sensors_list)
         self.col3_layout.addWidget(self.test_case_checkbox)
+        self.col3_layout.addWidget(self._resume_cycle_button)
+        self.col3_layout.addWidget(self._sensors_list)
+        
         
 
         # Main Overall Layout (3 columns)
@@ -486,6 +490,75 @@ class PumpControlApp(QMainWindow):
             self._flexlogger_conn_status = new_flex_status
             self.conn_layout.addWidget(self._flexlogger_conn_status, 1, 1)
 
+    def resume_cycle_entry(self):
+        """Dialog box for entering in cycles to resume test"""
+        dialog = QDialog()
+        dialog.setWindowTitle("Enter Values")
+        dialog.setFixedSize(300, 200)
+
+        # Layout
+        layout = QVBoxLayout()
+
+        # Resume pressure cycle
+        row1 = QHBoxLayout()
+        label1 = QLabel("Resume pressure cycle #:")
+        spinbox1 = QDoubleSpinBox()
+        spinbox1.setRange(0,999999)  
+        row1.addWidget(label1)
+        row1.addWidget(spinbox1)
+
+        # Resume fluid cycle
+        row2 = QHBoxLayout()
+        label2 = QLabel("Resume fluid cycle #:")
+        spinbox2 = QDoubleSpinBox()
+        spinbox2.setRange(0,999999)   
+        row2.addWidget(label2)
+        row2.addWidget(spinbox2)
+        # Remaining time
+        row3 = QHBoxLayout()
+        label3 = QLabel("Remaining time (s): ")
+        spinbox3 = QDoubleSpinBox()
+        spinbox3.setRange(0,999999)
+        row3.addWidget(label3)
+        row3.addWidget(spinbox3)
+
+        # Resume fluid cycle
+        row4 = QHBoxLayout()
+        label4  = QLabel("Resume chamber cycle #:")
+        spinbox4 = QDoubleSpinBox()
+        spinbox4.setRange(0,999999)   
+        row4.addWidget(label4)
+        row4.addWidget(spinbox4)
+        # Remaining time
+        row5 = QHBoxLayout()
+        label5 = QLabel("Remaining time (s): ")
+        spinbox5 = QDoubleSpinBox()
+        spinbox5.setRange(0,999999)
+        row5.addWidget(label5)
+        row5.addWidget(spinbox5)
+
+        # OK Button
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(dialog.accept)
+
+        layout.addLayout(row1)
+        layout.addLayout(row2)
+        layout.addLayout(row3)
+        layout.addLayout(row4)
+        layout.addLayout(row5)
+        layout.addWidget(ok_button)
+
+        dialog.setLayout(layout)
+
+        # Execute dialog
+        if dialog.exec():
+            self.pressure_cycle_count = spinbox1.value()
+            self.fluid_cycle_count = spinbox2.value()
+            self.chamber_cycle_count = spinbox4.value()
+            self.resume_cycle_enabled = True
+            print("updated cycle status")
+
+
     def calculate_period(self, cycle_period, cycle_min, cycle_max):
         """(STATIC) Create lists for x-axis and y-axis based on period, min, and max"""
         x = []  # Start with an empty list
@@ -527,9 +600,14 @@ class PumpControlApp(QMainWindow):
             # Deactivate and reset test
             self._test_active = False
             self.pressure_cycle_count = 0
-            self.fluid_cycle_count = 0
-            self.chamber_cycle_count = 0
-            self.pressure_drop_count = 0 # For pressure drop check
+
+            # Resuming test
+            if self.resume_cycle_enabled:
+                self.resume_cycle_enabled = False # pass this reinit
+            else:
+                self.fluid_cycle_count = 0
+                self.chamber_cycle_count = 0
+                self.pressure_drop_count = 0 # For pressure drop check
 
             # Initialize fluid cycling timer
             self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)

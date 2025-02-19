@@ -17,7 +17,7 @@ class Cantroller:
     
     def connect_to_instance(self, channel=0, bitrate=500000):
         try:
-            self.bus = can.interface.Bus(interface='vector', app_name='CANalyzer', channel=channel, bitrate=bitrate, receive_own_messages=True)
+            self.bus = can.interface.Bus(interface='vector', channel=channel, bitrate=bitrate, receive_own_messages=True)
             return True
         except can.CanInitializationError:
             print("Could not connect to CANBUS")
