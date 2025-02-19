@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SourceFile Checksum="333F917C00AF2A997D9C1E4EACC22FFBA03A237F7E3B3DD57A0DD618EBADFF3D32D3ACC3328F8F0F2D575EB78736D5FDD3BD785538AE57AA8B4B3A651604C964" Timestamp="1DB6C4E786F6527" xmlns="http://www.ni.com/PlatformFramework">
+	<SourceModelFeatureSet>
+		<ParsableNamespace AssemblyFileVersion="9.14.0.49865" FeatureSetName="Configuration Based Software Core" Name="http://www.ni.com/ConfigurationBasedSoftware.Core" OldestCompatibleVersion="6.3.0.49152" Version="9.8.1.49152" />
+		<ParsableNamespace AssemblyFileVersion="9.14.0.49865" FeatureSetName="Lumberjack Core" Name="http://www.ni.com/Lumberjack.Core" OldestCompatibleVersion="9.14.0.49152" Version="9.14.0.49152" />
+		<ParsableNamespace AssemblyFileVersion="9.14.0.49865" FeatureSetName="Editor" Name="http://www.ni.com/PlatformFramework" OldestCompatibleVersion="8.1.0.49152" Version="8.1.0.49152" />
+		<ApplicationVersionInfo Build="9.14.0.49865" Name="FlexLogger" Version="24.8.0.0" />
+	</SourceModelFeatureSet>
+	<Screen Id="73739f824ae7455b9e33ad8b3f66563e" xmlns="http://www.ni.com/Lumberjack.Core">
+		<ScreenSurface Height="[float]1600" Id="d2049700a3434b5280384af01a6dddd3" Left="[float]0" PanelSizeMode="Fixed" Top="[float]0" Width="[float]2000" xmlns="http://www.ni.com/ConfigurationBasedSoftware.Core" />
+	</Screen>
+</SourceFile>
