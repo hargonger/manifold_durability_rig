@@ -33,6 +33,7 @@ class PausableTimer:
         if self.timer:
             self.timer.cancel()
             elapsed_time = time.time() - self.start_time
+            print(f"elapsed time: {elapsed_time}")
             self.remaining_time -= elapsed_time
             self.paused = True
             print(f"remaining time: {self.remaining_time}")

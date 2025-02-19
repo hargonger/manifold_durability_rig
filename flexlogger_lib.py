@@ -10,7 +10,10 @@ class FlexLoggerInterface:
 
     def connect_to_instance(self):
         """Establish connection to the active FlexLogger project"""
-        self.project = self.app.get_active_project()
+        try:
+            self.project = self.app.get_active_project()
+        except FlexLoggerError:
+            return False
         
         if self.project is None:
             print("No project is open in FlexLogger! Please open an instance and try again.")

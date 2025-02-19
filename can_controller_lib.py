@@ -56,10 +56,8 @@ class Cantroller:
         # Allow threads to exit cleanly without forcing join()
         if self.bcm_thread and self.bcm_thread.is_alive():
             self.bcm_thread.join(timeout=1)
-            print("2.1")
         if self.pump2_thread and self.pump2_thread.is_alive():
             self.pump2_thread.join(timeout=1)
-            print("2.2")
 
     def shutdown(self):
         """Stops all CAN operations and ensures a clean shutdown."""

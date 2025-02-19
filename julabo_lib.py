@@ -78,10 +78,10 @@ class JULABO():
 		self.ser.flushInput()
 
 	def set_power_off(self):
-		print("1.1")
+		#print("1.1") # debug
 		response = self.send_command('out_mode_05 %d' % 0)
 		print(f"Command response: {response}")  # Debug
-		print("1.2")
+		#print("1.2") # debug
 
 
 	def set_power_on(self):
