@@ -21,7 +21,6 @@ class PumpControlApp(QMainWindow):
         super().__init__()
 
         self.initialize()
-        self.test_case() 
                                                      
     def test_case(self):
         self.total_period = 216
@@ -35,14 +34,20 @@ class PumpControlApp(QMainWindow):
         self.pressure_max_psi = 35
         self.pressure_min_psi = 0
 
+    def create_test_widget(self):
+        self.test_case_checkbox = QCheckBox("enable test case")
+        self.test_case_checkbox.setChecked(False)
+        self.test_case_checkbox.stateChanged.connect(lambda state: self.update_boolean('test_case_enabled', state))
+
     def initialize(self):
         self.setWindowTitle("Manifold Durability Cyclic Pressure Test")
-        self.setGeometry(100, 100, 600, 200)
+        self.setGeometry(100, 100, 800, 200)
         
         # Declare enables
         self._test_active = False
         self.profile_generated = False
         self.logging_enabled = False
+        self.test_case_enabled = False
 
         # Declare connections
         self.flexlogger_connected = False
@@ -109,6 +114,7 @@ class PumpControlApp(QMainWindow):
         self._live_status_title = self.create_title_label("LIVE STATUS")
         self.create_cycle_count_box()
         self.create_logging_widgets()
+        self.create_test_widget()
 
         # Widget depending on connection
         if self.flexlogger_connected:
@@ -151,6 +157,7 @@ class PumpControlApp(QMainWindow):
         self.col3_layout.addWidget(self._live_status_title)
         self.col3_layout.addWidget(self._cycle_count_box)
         self.col3_layout.addWidget(self._sensors_list)
+        self.col3_layout.addWidget(self.test_case_checkbox)
         
 
         # Main Overall Layout (3 columns)
@@ -174,7 +181,7 @@ class PumpControlApp(QMainWindow):
         # Set column 2 size
         self.col2_widget = QWidget()
         self.col2_widget.setLayout(self.col2_layout)
-        self.col2_widget.setFixedWidth(800)  
+        self.col2_widget.setFixedWidth(900)  
         # Set column 3 size
         self.col3_widget = QWidget()
         self.col3_widget.setLayout(self.col3_layout)
@@ -507,10 +514,15 @@ class PumpControlApp(QMainWindow):
 
     def generate_profile(self):
         """(STATIC) Generate a plot based on enabled cycles"""
+        
         if self.create_dialogue_yes_no_box("Confirmation", "Are you sure you want to generate new profile?"):
             print("generating profile")
             # Enable bool
             self.profile_generated = True
+            
+            #test case
+            if self.test_case_enabled:
+                self.test_case() 
 
             # Deactivate and reset test
             self._test_active = False
@@ -649,7 +661,7 @@ class PumpControlApp(QMainWindow):
                         else:                                     # if not, reset count
                             self.pressure_drop_count = 0
                         
-                        #print(f"pressure drop count: {self.pressure_drop_count}") # Debug statement
+                        print(f"pressure drop count: {self.pressure_drop_count}") # Debug statement
                         if self.pressure_drop_count > 100:
                             print("Pressure drop detected, test paused")
                             self._test_active = False
