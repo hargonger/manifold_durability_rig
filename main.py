@@ -554,8 +554,13 @@ class PumpControlApp(QMainWindow):
         if dialog.exec():
             self.pressure_cycle_count = spinbox1.value()
             self.fluid_cycle_count = spinbox2.value()
+            self._fluid_timer.remaining_time = spinbox3.value() #set fluid timer remaining time
+            self._fluid_timer.paused = True #set to paused to simulate resuming
             self.chamber_cycle_count = spinbox4.value()
+            self._chamber_timer.remaining_time = spinbox5.value() #set chamber timer remaining time
+            self._chamber_timer.paused = True #set to paused to simulate resuming
             self.resume_cycle_enabled = True
+                       
             print("updated cycle status")
 
 
