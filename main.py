@@ -797,6 +797,8 @@ class PumpControlApp(QMainWindow):
         """(STATIC) Disables test active bool"""
         # Disable test bool
         self._test_active = False
+        self._fluid_timer.pause()
+        self._chamber_timer.pause()
         print("pausing test")
         # Stops the pressure profile (does not reset pressure_cycle_count)
         if hasattr(self, "test_thread") and self.test_thread.is_alive():
