@@ -68,11 +68,11 @@ class Cantroller:
 
     def set_bcm_power(self, value):
         self.bcm_power = value
-        print(f"Updated BCM Work Percent to {value}%")
+        print(f"Updated 'BCM Work Percent' to {value}%")
 
     def set_pump2_power(self, value):
         self.pump2_power = value
-        print(f"Updated PUMP2 Motor Speed Command to {value}%")
+        print(f"Updated 'PUMP2 Motor Speed' Command to {value}%")
 
 if __name__ == '__main__':
     controller = Cantroller()

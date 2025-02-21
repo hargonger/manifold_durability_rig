@@ -24,7 +24,7 @@ class PausableTimer:
         self.timer = threading.Timer(self.remaining_time, self._execute)
         self.timer.daemon = True
         self.timer.start()
-        print(f"remaining time: {self.remaining_time}")
+        print(f"Remaining time: {self.remaining_time}")
 
     def _execute(self):
         """Execute the function and restart the timer unless stopped."""
@@ -56,7 +56,7 @@ class PausableTimer:
             self.timer = None  # Ensure the timer reference is removed
         self.remaining_time = self.interval
         self.paused = False
-        print("test stopped")
+        print("Test stopped")
 
 if __name__ == "__main__":
 
