@@ -764,7 +764,7 @@ class PumpControlApp(QMainWindow):
                             self.pressure_drop_count = 0
                         
                         print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
-                        if self.pressure_drop_count > 100:
+                        if self.pressure_drop_count > 30:
                             print("Pressure drop detected, test crashed")
                             self._test_active = False
                             self.create_crash_file()
