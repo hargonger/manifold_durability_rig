@@ -459,7 +459,7 @@ class PumpControlApp(QMainWindow):
         print("Connecting to Julabo")
 
         try:
-            self._julabo = JULABO('COM4', baud=4800) #change based on COM port
+            self._julabo = JULABO('COM5', baud=4800) #change based on COM port
 
             # Test if communication works
             response = self._julabo.get_version()
