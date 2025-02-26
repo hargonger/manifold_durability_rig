@@ -191,7 +191,7 @@ class PumpControlApp(QMainWindow):
         # Set column 3 size
         self.col3_widget = QWidget()
         self.col3_widget.setLayout(self.col3_layout)
-        self.col3_widget.setFixedWidth(220)
+        self.col3_widget.setFixedWidth(260)
         # Set widget heights
         # Col1
         self._test_param_title.setFixedHeight(30)
@@ -881,8 +881,8 @@ class PumpControlApp(QMainWindow):
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(80)
-            self._cantroller.set_pump2_power(80)
+            self._cantroller.set_bcm_power(83)
+            self._cantroller.set_pump2_power(83)
             time.sleep(4.27)
 
             self._cantroller.set_bcm_power(0)
