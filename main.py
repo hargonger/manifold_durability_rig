@@ -889,8 +889,8 @@ class PumpControlApp(QMainWindow):
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(84)
-            self._cantroller.set_pump2_power(84)
+            self._cantroller.set_bcm_power(82)
+            self._cantroller.set_pump2_power(82)
             time.sleep(4.52)
 
             self._cantroller.set_bcm_power(0)
