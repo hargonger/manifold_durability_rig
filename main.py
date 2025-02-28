@@ -23,7 +23,7 @@ class PumpControlApp(QMainWindow):
         self.initialize()
                                                      
     def test_case(self):
-        self.total_period = 216
+        self.total_period = 648
         self.fluid_period = 12 
         self.fluid_min_temp = -20
         self.fluid_max_temp = 40
@@ -35,7 +35,7 @@ class PumpControlApp(QMainWindow):
         self.pressure_min_psi = 0
 
     def create_test_widget(self):
-        self.test_case_checkbox = QCheckBox("enable test case")
+        self.test_case_checkbox = QCheckBox("enable cyclic profile")
         self.test_case_checkbox.setChecked(False)
         self.test_case_checkbox.stateChanged.connect(lambda state: self.update_boolean('test_case_enabled', state))
 
@@ -130,6 +130,7 @@ class PumpControlApp(QMainWindow):
         # Column 1 Layout
         self.col1_layout = QVBoxLayout()
         self.col1_layout.addWidget(self._test_param_title)
+        self.col1_layout.addWidget(self.test_case_checkbox)
         self.col1_layout.addWidget(self._total_test_box)
         self.col1_layout.addWidget(self._fluid_cycle_box)
         self.col1_layout.addWidget(self._chamber_cycle_box)
@@ -160,7 +161,6 @@ class PumpControlApp(QMainWindow):
         self.col3_layout = QVBoxLayout()
         self.col3_layout.addWidget(self._live_status_title)
         self.col3_layout.addWidget(self._cycle_count_box)
-        self.col3_layout.addWidget(self.test_case_checkbox)
         self.col3_layout.addWidget(self._resume_cycle_button)
         self.col3_layout.addWidget(self._sensors_list)
         
@@ -764,7 +764,7 @@ class PumpControlApp(QMainWindow):
                             self.pressure_drop_count = 0
                         
                         print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
-                        if self.pressure_drop_count > 30:
+                        if self.pressure_drop_count > 40:
                             print("Pressure drop detected, test crashed")
                             self._test_active = False
                             self.create_crash_file()
@@ -881,13 +881,13 @@ class PumpControlApp(QMainWindow):
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(83)
-            self._cantroller.set_pump2_power(83)
-            time.sleep(4.27)
+            self._cantroller.set_bcm_power(84)
+            self._cantroller.set_pump2_power(84)
+            time.sleep(4.52)
 
             self._cantroller.set_bcm_power(0)
             self._cantroller.set_pump2_power(0)
-            time.sleep(1)  
+            time.sleep(.75)  
 
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
 
