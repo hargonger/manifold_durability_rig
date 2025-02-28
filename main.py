@@ -49,6 +49,7 @@ class PumpControlApp(QMainWindow):
         self.logging_enabled = False
         self.test_case_enabled = False
         self.resume_cycle_enabled = False
+        self.initial_start = False
 
         # Declare connections
         self.flexlogger_connected = False
@@ -617,6 +618,7 @@ class PumpControlApp(QMainWindow):
             print("generating profile")
             # Enable bool
             self.profile_generated = True
+            self.initial_start = True
             
             #test case
             if self.test_case_enabled:
@@ -764,7 +766,7 @@ class PumpControlApp(QMainWindow):
                             self.pressure_drop_count = 0
                         
                         print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
-                        if self.pressure_drop_count > 40:
+                        if self.pressure_drop_count > 100:
                             print("Pressure drop detected, test crashed")
                             self._test_active = False
                             self.create_crash_file()
@@ -807,6 +809,12 @@ class PumpControlApp(QMainWindow):
             # Run pressure profile            
             self.test_thread = threading.Thread(target=self.run_test_profile, daemon=True) # This is in separate thread to allow for GUI interaction
             self.test_thread.start()
+
+            # Time
+            if self.initial_start:
+                self.last_fluid_time = time.time() - self.fluid_remaining_time
+                self.last_chamber_time = time.time() - self.chamber_remaining_time
+                self.initial_start = False
 
 
         else:
