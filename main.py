@@ -764,6 +764,9 @@ class PumpControlApp(QMainWindow):
                             self.pressure_drop_count +=1
                         else:                                     # if not, reset count
                             self.pressure_drop_count = 0
+
+                        if curr_pressure < 30: #Used to debug pressure drops
+                            print(f"Pressure: {curr_pressure}")
                         
                         print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
                         if self.pressure_drop_count > 10000:
