@@ -633,6 +633,7 @@ class PumpControlApp(QMainWindow):
                 self.fluid_cycle_count = 0
                 self.chamber_cycle_count = 0
                 self.pressure_drop_count = 0 # For pressure drop check
+                self.pressure_drop_debug = 0
 
             # Initialize fluid cycling timer
             self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
@@ -760,13 +761,16 @@ class PumpControlApp(QMainWindow):
                     # inlet pressure drop check
                     if "psi" in sensor.lower() and "inlet" in sensor.lower():
                         curr_pressure = new_value # Sets current value to sensor reading
-                        if curr_pressure < self.pressure_max_psi - 8: # if current pressure < max psi add to count -5 for range
+                        if curr_pressure < self.pressure_max_psi - 8: # if current pressure < max psi add to count -8 for range
                             self.pressure_drop_count +=1
                         else:                                     # if not, reset count
                             self.pressure_drop_count = 0
 
-                        if curr_pressure < 30: #Used to debug pressure drops
-                            print(f"Pressure: {curr_pressure}")
+                        if curr_pressure < 30: #Used to debug current 28 psi issue
+                            self.pressure_drop_debug +=1
+                        else:
+                            self.pressure_drop_debug = 0
+                        print(f"<30 PSI drop count: --------- {self.pressure_drop_debug}") # debug debug statement
                         
                         print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
                         if self.pressure_drop_count > 10000:
