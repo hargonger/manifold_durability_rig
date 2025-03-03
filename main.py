@@ -460,7 +460,7 @@ class PumpControlApp(QMainWindow):
         print("Connecting to Julabo")
 
         try:
-            self._julabo = JULABO('COM6', baud=4800) #change based on COM port
+            self._julabo = JULABO('COM3', baud=4800) #change based on COM port
 
             # Test if communication works
             response = self._julabo.get_version()
@@ -760,7 +760,7 @@ class PumpControlApp(QMainWindow):
                     # inlet pressure drop check
                     if "psi" in sensor.lower() and "inlet" in sensor.lower():
                         curr_pressure = new_value # Sets current value to sensor reading
-                        if curr_pressure < self.pressure_max_psi - 5: # if current pressure < max psi add to count -5 for range
+                        if curr_pressure < self.pressure_max_psi - 8: # if current pressure < max psi add to count -5 for range
                             self.pressure_drop_count +=1
                         else:                                     # if not, reset count
                             self.pressure_drop_count = 0
@@ -812,8 +812,8 @@ class PumpControlApp(QMainWindow):
 
             # Time
             if self.initial_start:
-                self.last_fluid_time = time.time() - self.fluid_remaining_time
-                self.last_chamber_time = time.time() - self.chamber_remaining_time
+                self.last_fluid_time = time.time() - (self.fluid_period * 3600 - self.fluid_remaining_time)
+                self.last_chamber_time = time.time() - (self.chamber_period * 3600 - self.chamber_remaining_time)
                 self.initial_start = False
 
 
@@ -840,7 +840,7 @@ class PumpControlApp(QMainWindow):
         crash_time = time.time()
 
         # Create crash file
-        self.crash_filename = crash_timestamp + "_Crash"
+        self.crash_filename = crash_timestamp + "_Crash.csv"
         with open(self.crash_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["pressure_cycle_count", "fluid_cycle_count", "fluid_cycle_remaining_seconds", "chamber_cycle_count", "chamber_cycle_remaining_seconds"])
@@ -856,7 +856,7 @@ class PumpControlApp(QMainWindow):
     def create_log_file(self, name):
         """(STATIC) Creates a CSV file with a timestamped header including sensor names."""
         sensors = self._flex.get_sensor_list()  # Get list of sensor names
-        self.curr_filename = self.get_timestamp() + "_" + name
+        self.curr_filename = self.get_timestamp() + "_" + name + ".csv"
         with open(self.curr_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["timestamp"] + ["pressure_cycle_count"] + sensors)  # Write header row once
