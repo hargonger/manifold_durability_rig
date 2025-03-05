@@ -35,7 +35,7 @@ class PumpControlApp(QMainWindow):
         self.pressure_min_psi = 0
 
     def create_test_widget(self):
-        self.test_case_checkbox = QCheckBox("enable test case")
+        self.test_case_checkbox = QCheckBox("enable cyclic profile")
         self.test_case_checkbox.setChecked(False)
         self.test_case_checkbox.stateChanged.connect(lambda state: self.update_boolean('test_case_enabled', state))
 
@@ -49,6 +49,7 @@ class PumpControlApp(QMainWindow):
         self.logging_enabled = False
         self.test_case_enabled = False
         self.resume_cycle_enabled = False
+        self.initial_start = False
 
         # Declare connections
         self.flexlogger_connected = False
@@ -130,6 +131,7 @@ class PumpControlApp(QMainWindow):
         # Column 1 Layout
         self.col1_layout = QVBoxLayout()
         self.col1_layout.addWidget(self._test_param_title)
+        self.col1_layout.addWidget(self.test_case_checkbox)
         self.col1_layout.addWidget(self._total_test_box)
         self.col1_layout.addWidget(self._fluid_cycle_box)
         self.col1_layout.addWidget(self._chamber_cycle_box)
@@ -160,7 +162,6 @@ class PumpControlApp(QMainWindow):
         self.col3_layout = QVBoxLayout()
         self.col3_layout.addWidget(self._live_status_title)
         self.col3_layout.addWidget(self._cycle_count_box)
-        self.col3_layout.addWidget(self.test_case_checkbox)
         self.col3_layout.addWidget(self._resume_cycle_button)
         self.col3_layout.addWidget(self._sensors_list)
         
@@ -191,7 +192,7 @@ class PumpControlApp(QMainWindow):
         # Set column 3 size
         self.col3_widget = QWidget()
         self.col3_widget.setLayout(self.col3_layout)
-        self.col3_widget.setFixedWidth(220)
+        self.col3_widget.setFixedWidth(260)
         # Set widget heights
         # Col1
         self._test_param_title.setFixedHeight(30)
@@ -617,6 +618,7 @@ class PumpControlApp(QMainWindow):
             print("generating profile")
             # Enable bool
             self.profile_generated = True
+            self.initial_start = True
             
             #test case
             if self.test_case_enabled:
@@ -631,6 +633,7 @@ class PumpControlApp(QMainWindow):
                 self.fluid_cycle_count = 0
                 self.chamber_cycle_count = 0
                 self.pressure_drop_count = 0 # For pressure drop check
+                self.pressure_drop_debug = 0
 
             # Initialize fluid cycling timer
             self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
@@ -758,13 +761,13 @@ class PumpControlApp(QMainWindow):
                     # inlet pressure drop check
                     if "psi" in sensor.lower() and "inlet" in sensor.lower():
                         curr_pressure = new_value # Sets current value to sensor reading
-                        if curr_pressure < 28.5: # if current pressure < max psi add to count -5 for range
+                        if curr_pressure < 29: # if current pressure < max psi add to count -8 for range
                             self.pressure_drop_count +=1
                         else:                                     # if not, reset count
                             self.pressure_drop_count = 0
                         
                         print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
-                        if self.pressure_drop_count > 40:
+                        if self.pressure_drop_count > 100:
                             print("Pressure drop detected, test crashed")
                             self._test_active = False
                             self.create_crash_file()
@@ -808,6 +811,12 @@ class PumpControlApp(QMainWindow):
             self.test_thread = threading.Thread(target=self.run_test_profile, daemon=True) # This is in separate thread to allow for GUI interaction
             self.test_thread.start()
 
+            # Time
+            if self.initial_start:
+                self.last_fluid_time = time.time() - (self.fluid_period * 3600 - self.fluid_remaining_time)
+                self.last_chamber_time = time.time() - (self.chamber_period * 3600 - self.chamber_remaining_time)
+                self.initial_start = False
+
 
         else:
             self.create_dialogue_ok_box("Warning", "Profile not generated!")
@@ -832,7 +841,7 @@ class PumpControlApp(QMainWindow):
         crash_time = time.time()
 
         # Create crash file
-        self.crash_filename = crash_timestamp + "_Crash"
+        self.crash_filename = crash_timestamp + "_Crash.csv"
         with open(self.crash_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["pressure_cycle_count", "fluid_cycle_count", "fluid_cycle_remaining_seconds", "chamber_cycle_count", "chamber_cycle_remaining_seconds"])
@@ -848,7 +857,7 @@ class PumpControlApp(QMainWindow):
     def create_log_file(self, name):
         """(STATIC) Creates a CSV file with a timestamped header including sensor names."""
         sensors = self._flex.get_sensor_list()  # Get list of sensor names
-        self.curr_filename = self.get_timestamp() + "_" + name
+        self.curr_filename = self.get_timestamp() + "_" + name + ".csv"
         with open(self.curr_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["timestamp"] + ["pressure_cycle_count"] + sensors)  # Write header row once
@@ -881,13 +890,13 @@ class PumpControlApp(QMainWindow):
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(80)
-            self._cantroller.set_pump2_power(80)
-            time.sleep(4.27)
+            self._cantroller.set_bcm_power(83)
+            self._cantroller.set_pump2_power(83)
+            time.sleep(4.5)
 
             self._cantroller.set_bcm_power(0)
             self._cantroller.set_pump2_power(0)
-            time.sleep(1)  
+            time.sleep(.75)  
 
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
 
