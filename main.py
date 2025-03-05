@@ -885,17 +885,17 @@ class PumpControlApp(QMainWindow):
         
         # Initial sequence to let test warm up
         if self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(60)
-            #self._cantroller.set_pump2_power(60)
+           # self._cantroller.set_bcm_power(60)
+            self._cantroller.set_pump2_power(60)
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(83)
-            #self._cantroller.set_pump2_power(83)
+            #self._cantroller.set_bcm_power(83)
+            self._cantroller.set_pump2_power(83)
             time.sleep(4.5)
 
-            self._cantroller.set_bcm_power(0)
-            #self._cantroller.set_pump2_power(0)
+            #self._cantroller.set_bcm_power(0)
+            self._cantroller.set_pump2_power(0)
             time.sleep(.75)  
 
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
