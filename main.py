@@ -761,7 +761,7 @@ class PumpControlApp(QMainWindow):
                     # inlet pressure drop check
                     if "psi" in sensor.lower() and "inlet" in sensor.lower():
                         curr_pressure = new_value # Sets current value to sensor reading
-                        if curr_pressure < 10: # if current pressure < max psi add to count -8 for range
+                        if curr_pressure < 30: # if current pressure < max psi add to count -8 for range
                             self.pressure_drop_count +=1
                         else:                                     # if not, reset count
                             self.pressure_drop_count = 0
@@ -885,17 +885,17 @@ class PumpControlApp(QMainWindow):
         
         # Initial sequence to let test warm up
         if self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-           # self._cantroller.set_bcm_power(60)
-            self._cantroller.set_pump2_power(60)
+            self._cantroller.set_bcm_power(60)
+            self._cantroller.set_ptn_power(60)
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            #self._cantroller.set_bcm_power(83)
-            self._cantroller.set_pump2_power(83)
+            self._cantroller.set_bcm_power(75)
+            self._cantroller.set_ptn_power(75)
             time.sleep(4.5)
 
-            #self._cantroller.set_bcm_power(0)
-            self._cantroller.set_pump2_power(0)
+            self._cantroller.set_bcm_power(0)
+            self._cantroller.set_ptn_power(0)
             time.sleep(.75)  
 
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
