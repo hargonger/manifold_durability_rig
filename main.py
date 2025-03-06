@@ -890,13 +890,13 @@ class PumpControlApp(QMainWindow):
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(70)
+            self._cantroller.set_bcm_power(75)
             self._cantroller.set_ptn_power(75)
-            time.sleep(4.27)
+            time.sleep(4)
 
             self._cantroller.set_bcm_power(0)
             self._cantroller.set_ptn_power(0)
-            time.sleep(1)  
+            time.sleep(1.27)  
 
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
 
