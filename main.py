@@ -551,6 +551,11 @@ class PumpControlApp(QMainWindow):
 
         # Execute dialog
         if dialog.exec():
+
+            # Initialize fluid cycling timer
+            self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
+            self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
+                        
             self.pressure_cycle_count = spinbox1.value()
 
             self.fluid_cycle_count = spinbox2.value()
@@ -633,9 +638,9 @@ class PumpControlApp(QMainWindow):
                 self.pressure_drop_count = 0
                 self.pressure_cycle_count = 0
 
-            # Initialize fluid cycling timer
-            self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
-            self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
+                # Initialize fluid cycling timer
+                self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
+                self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
 
             # Clear both graphs and reset the range
             self._graph_1.clear()
