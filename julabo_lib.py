@@ -1,4 +1,4 @@
-
+""" Library from https://github.com/jopekonk/julabolib/blob/master/julabolib.py"""
 import logging
 import serial
 import time
