@@ -550,7 +550,7 @@ class PumpControlApp(QMainWindow):
         dialog.setLayout(layout)
 
         # Execute dialog
-        if dialog.exec() and self.profile_generated:
+        if dialog.exec():
             self.pressure_cycle_count = spinbox1.value()
 
             self.fluid_cycle_count = spinbox2.value()
@@ -570,11 +570,12 @@ class PumpControlApp(QMainWindow):
                 print("hi")
 
             self.resume_cycle_enabled = True
+            print("updated cycle status")
                        
         else:
             self.create_dialogue_ok_box("Error", "Profile not generated! Generate profile first.")
                        
-            print("updated cycle status")
+        
 
     def calculate_period(self, cycle_period, cycle_min, cycle_max):
         """(STATIC) Create lists for x-axis and y-axis based on period, min, and max"""
@@ -619,7 +620,6 @@ class PumpControlApp(QMainWindow):
             self.initial_start = True
             # Deactivate and reset test
             self._test_active = False
-            self.pressure_cycle_count = 0
             self.cycle_log_count = 0
             
             # Cyclic Case Enable
@@ -631,6 +631,7 @@ class PumpControlApp(QMainWindow):
                 self.fluid_cycle_count = 0
                 self.chamber_cycle_count = 0
                 self.pressure_drop_count = 0
+                self.pressure_cycle_count = 0
 
             # Initialize fluid cycling timer
             self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
@@ -946,8 +947,9 @@ class PumpControlApp(QMainWindow):
     def closeEvent(self, event):
         """(STATIC) Override to cleanly stop the timer on window close"""
         if self._test_active:
-            self.stop_test()
             self.create_crash_file()
+            self.stop_test()
+
         if self.julabo_connected:
             self._julabo.close()
         if self.canbus_connected:

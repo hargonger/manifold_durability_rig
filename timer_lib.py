@@ -7,7 +7,6 @@ class PausableTimer:
         self.function = function
         self.timer = None
         self.start_time = None
-        self.remaining_time = interval
         self.paused = False
 
     def start(self):
