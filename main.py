@@ -910,8 +910,8 @@ class PumpControlApp(QMainWindow):
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
 
             self.pressure_cycle_count += 1
-            self.cycle_log_count += 1000
-            print(self.cycle_log_count)
+            self.cycle_log_count += 1
+            #print(self.cycle_log_count) # debug statement
             self.pressure_cycle_count_label.setText(f"Pressure Cycle Count: {self.pressure_cycle_count}/{self.pressure_num_cycles}")
 
         # PAUSING BEHAVIOUR
