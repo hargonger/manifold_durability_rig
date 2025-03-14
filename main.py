@@ -32,6 +32,7 @@ class PumpControlApp(QMainWindow):
         self.pressure_max_psi = 35
         self.pressure_min_psi = 0
 
+
     def create_test_widget(self):
         self.test_case_checkbox = QCheckBox("enable cyclic profile")
         self.test_case_checkbox.setChecked(False)
@@ -75,6 +76,7 @@ class PumpControlApp(QMainWindow):
         self.fluid_remaining_time = 0
         self.chamber_remaining_time = 0
         self.cycle_log_count = 0
+        self.pressure_drop_count = 0
 
         self.initialize_widgets()
         self.initialize_layouts()  
@@ -555,7 +557,7 @@ class PumpControlApp(QMainWindow):
             # Initialize fluid cycling timer
             self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
             self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
-                        
+
             self.pressure_cycle_count = spinbox1.value()
 
             self.fluid_cycle_count = spinbox2.value()
@@ -578,7 +580,7 @@ class PumpControlApp(QMainWindow):
             print("updated cycle status")
                        
         else:
-            self.create_dialogue_ok_box("Error", "Profile not generated! Generate profile first.")
+            self.create_dialogue_ok_box("Error", "Resume test canceled")
                        
         
 
@@ -610,6 +612,11 @@ class PumpControlApp(QMainWindow):
 
     def generate_profile(self):
         """(STATIC) Generate a plot based on enabled cycles"""
+
+        # debugging without connection
+        #self.flexlogger_connected = True
+        #self.julabo_connected = True
+        #self.canbus_connected = True
 
         if not self.flexlogger_connected:
             self.create_dialogue_ok_box("Error", "Flexlogger not connected!")
@@ -903,7 +910,8 @@ class PumpControlApp(QMainWindow):
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement
 
             self.pressure_cycle_count += 1
-            self.cycle_log_count += 1
+            self.cycle_log_count += 1000
+            print(self.cycle_log_count)
             self.pressure_cycle_count_label.setText(f"Pressure Cycle Count: {self.pressure_cycle_count}/{self.pressure_num_cycles}")
 
         # PAUSING BEHAVIOUR
