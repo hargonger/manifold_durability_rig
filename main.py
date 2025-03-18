@@ -1,4 +1,5 @@
 import sys
+import os
 import serial
 import csv
 import pyqtgraph as pg
@@ -13,6 +14,7 @@ from flexlogger_lib import FlexLoggerInterface
 from can_controller_lib import Cantroller
 from julabo_lib import JULABO
 from timer_lib import PausableTimer
+
 
 class PumpControlApp(QMainWindow):
     def __init__(self):
@@ -32,7 +34,6 @@ class PumpControlApp(QMainWindow):
         self.pressure_max_psi = 35
         self.pressure_min_psi = 0
 
-
     def create_test_widget(self):
         self.test_case_checkbox = QCheckBox("enable cyclic profile")
         self.test_case_checkbox.setChecked(False)
@@ -45,6 +46,7 @@ class PumpControlApp(QMainWindow):
         # Declare enables
         self._test_active = False
         self.profile_generated = False
+        self.logging_enabled = True
         self.test_case_enabled = False
         self.resume_cycle_enabled = False
         self.initial_start = False
@@ -76,7 +78,6 @@ class PumpControlApp(QMainWindow):
         self.fluid_remaining_time = 0
         self.chamber_remaining_time = 0
         self.cycle_log_count = 0
-        self.pressure_drop_count = 0
 
         self.initialize_widgets()
         self.initialize_layouts()  
@@ -136,9 +137,9 @@ class PumpControlApp(QMainWindow):
         self.col1_layout.addWidget(self._fluid_cycle_box)
         self.col1_layout.addWidget(self._chamber_cycle_box)
         self.col1_layout.addWidget(self._pressure_cycle_box)
-        self.col1_layout.addWidget(self._resume_cycle_button)
         self.col1_layout.addWidget(self.file_name_input)
         self.col1_layout.addWidget(self._generate_profile_button)
+        self.col1_layout.addWidget(self._resume_cycle_button)
         
         # Column 2 Layout
         self.col2_layout = QVBoxLayout()
@@ -366,6 +367,11 @@ class PumpControlApp(QMainWindow):
         self.file_name_input = QLineEdit()
         self.file_name_input.setPlaceholderText("Enter file name") 
         self.file_name_input.textChanged.connect(lambda value: self.update_variable("log_file_name", value))
+         
+        # Enable checkbox
+        self.log_checkbox = QCheckBox("enable logging")
+        self.log_checkbox.setChecked(False)
+        self.log_checkbox.stateChanged.connect(lambda state: self.update_boolean('logging_enabled', state))
 
     def create_button(self, label, callback):
         """Create a button"""
@@ -552,12 +558,7 @@ class PumpControlApp(QMainWindow):
         dialog.setLayout(layout)
 
         # Execute dialog
-        if dialog.exec():
-
-            # Initialize fluid cycling timer
-            self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
-            self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
-
+        if dialog.exec() and self.profile_generated:
             self.pressure_cycle_count = spinbox1.value()
 
             self.fluid_cycle_count = spinbox2.value()
@@ -577,12 +578,12 @@ class PumpControlApp(QMainWindow):
                 print("hi")
 
             self.resume_cycle_enabled = True
-            print("updated cycle status")
                        
         else:
-            self.create_dialogue_ok_box("Error", "Resume test canceled")
+            self.create_dialogue_ok_box("Error", "Profile not generated! Generate profile first.")
                        
-        
+            print("updated cycle status")
+
 
     def calculate_period(self, cycle_period, cycle_min, cycle_max):
         """(STATIC) Create lists for x-axis and y-axis based on period, min, and max"""
@@ -612,42 +613,32 @@ class PumpControlApp(QMainWindow):
 
     def generate_profile(self):
         """(STATIC) Generate a plot based on enabled cycles"""
-
-        # debugging without connection
-        #self.flexlogger_connected = True
-        #self.julabo_connected = True
-        #self.canbus_connected = True
-
-        if not self.flexlogger_connected:
-            self.create_dialogue_ok_box("Error", "Flexlogger not connected!")
-        elif not self.julabo_connected:
-            self.create_dialogue_ok_box("Error", "Julabo not connected!")
-        elif not self.canbus_connected:
-            self.create_dialogue_ok_box("Error", "CANBUS not connected!")                
-        elif self.create_dialogue_yes_no_box("Confirmation", "Are you sure you want to generate new profile?"):
-
-            print("Generating profile")
+        
+        if self.create_dialogue_yes_no_box("Confirmation", "Are you sure you want to generate new profile?"):
+            print("generating profile")
             # Enable bool
             self.profile_generated = True
             self.initial_start = True
-            # Deactivate and reset test
-            self._test_active = False
-            self.cycle_log_count = 0
             
-            # Cyclic Case Enable
+            #test case
             if self.test_case_enabled:
                 self.test_case() 
+
+            # Deactivate and reset test
+            self._test_active = False
+            self.pressure_cycle_count = 0
+            self.cycle_log_count = 0
 
             # Resuming test
             if not self.resume_cycle_enabled:
                 self.fluid_cycle_count = 0
                 self.chamber_cycle_count = 0
-                self.pressure_drop_count = 0
-                self.pressure_cycle_count = 0
+                self.pressure_drop_count = 0 # For pressure drop check
+                self.pressure_drop_debug = 0
 
-                # Initialize fluid cycling timer
-                self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
-                self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
+            # Initialize fluid cycling timer
+            self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
+            self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
 
             # Clear both graphs and reset the range
             self._graph_1.clear()
@@ -676,7 +667,8 @@ class PumpControlApp(QMainWindow):
             self.chamber_cycle_count_label.setText(f"Chamber Cycle Count: {self.chamber_cycle_count}/{self.chamber_num_cycles}")
 
             # LOGGING
-            self.create_log_file(self.log_file_name)
+            if self.logging_enabled:
+                self.create_log_file(self.log_file_name)
 
     def init_curve_plot(self, graph, color):
         """(STATIC) Create a live plot 'curve' for a sensor"""
@@ -697,6 +689,7 @@ class PumpControlApp(QMainWindow):
                     if len(x_data) > 0:
                         self._graph_2.setXRange(x_data[0], x_data[-1], padding=0.1)
 
+                if self.logging_enabled:
                     self.update_log_file()
 
     def _choose_graph(self, sensor_label):
@@ -722,6 +715,10 @@ class PumpControlApp(QMainWindow):
             # For every sensor in the list, create a label widget, value array, curve
             for row, sen in enumerate(sensors):
                 sensor_label = QLabel("0.00")
+
+                # Initialize CSV file for logging
+                if self.logging_enabled:
+                    pass
 
                 # Dict to store sensor properties
                 self.sensor_data[sen] = {
@@ -776,11 +773,6 @@ class PumpControlApp(QMainWindow):
                             self._test_active = False
                             self.create_crash_file()
                             self.create_dialogue_ok_box("Test Error", "Pressure drop detected, test paused")
-
-                    # Split log file into sizeable amounts
-                    if self.cycle_log_count > 16000:
-                        self.create_log_file(self.log_file_name)
-                        self.cycle_log_count = 0
                             
 
             except ValueError:
@@ -863,10 +855,10 @@ class PumpControlApp(QMainWindow):
 
         print(f"Crash file '{self.crash_filename}' created successfully.")
 
-    def create_log_file(self, name):
+    def create_log_file(self, name=""):
         """(STATIC) Creates a CSV file with a timestamped header including sensor names."""
         sensors = self._flex.get_sensor_list()  # Get list of sensor names
-        self.curr_filename = self.get_timestamp() + "_" + name 
+        self.curr_filename = self.get_timestamp() + "_" + name
         with open(self.curr_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["timestamp"] + ["pressure_cycle_count"] + sensors)  # Write header row once
@@ -911,7 +903,12 @@ class PumpControlApp(QMainWindow):
 
             self.pressure_cycle_count += 1
             self.cycle_log_count += 1
-            #print(self.cycle_log_count) # debug statement
+            print(f"Cycle Log #: {self.cycle_log_count}")
+
+            if self.cycle_log_count > 16000:
+                self.create_log_file(self.curr_filename)
+                self.cycle_log_count = 0
+                
             self.pressure_cycle_count_label.setText(f"Pressure Cycle Count: {self.pressure_cycle_count}/{self.pressure_num_cycles}")
 
         # PAUSING BEHAVIOUR
@@ -948,6 +945,7 @@ class PumpControlApp(QMainWindow):
         self.chamber_cycle_count+=1
         self.chamber_cycle_count_label.setText(f"Chamber Cycle Count: {self.chamber_cycle_count}/{self.chamber_num_cycles}")
         
+
     def stop_test(self):
         """(STATIC) Stop moving components of test"""
         if self.julabo_connected:
@@ -962,12 +960,12 @@ class PumpControlApp(QMainWindow):
         if self._test_active:
             self.create_crash_file()
             self.stop_test()
-
         if self.julabo_connected:
             self._julabo.close()
         if self.canbus_connected:
             self._cantroller.shutdown()
         event.accept()  # Proceed with window closing
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
