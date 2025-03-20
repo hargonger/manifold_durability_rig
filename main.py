@@ -858,7 +858,8 @@ class PumpControlApp(QMainWindow):
     def create_log_file(self, name=""):
         """(STATIC) Creates a CSV file with a timestamped header including sensor names."""
         sensors = self._flex.get_sensor_list()  # Get list of sensor names
-        self.curr_filename = self.get_timestamp() + "_" + name
+        self.log_input_name = name
+        self.curr_filename = self.get_timestamp() + "_" + self.log_input_name
         with open(self.curr_filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["timestamp"] + ["pressure_cycle_count"] + sensors)  # Write header row once
@@ -906,7 +907,7 @@ class PumpControlApp(QMainWindow):
             print(f"Cycle Log #: {self.cycle_log_count}")
 
             if self.cycle_log_count > 16000:
-                self.create_log_file(self.curr_filename)
+                self.create_log_file(self.log_input_name)
                 self.cycle_log_count = 0
                 
             self.pressure_cycle_count_label.setText(f"Pressure Cycle Count: {self.pressure_cycle_count}/{self.pressure_num_cycles}")
