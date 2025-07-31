@@ -5,7 +5,6 @@ import time
 class Cantroller:
     def __init__(self):
         
-        
         # Default values
         self.bcm_power = 0
         self.ptn_power = 0
@@ -36,7 +35,7 @@ class Cantroller:
         while self.running:
             raw_value = self.encode_signal(self.bcm_power, 1, 0, 100)
             data = [raw_value, 0, 0xC8, 0x01, 0, 0, 0, 0]
-            message = can.Message(arbitration_id=0x203, data=data, is_extended_id=False, is_rx=False) #ID is 0x203 for BCM pump
+            message = can.Message(arbitration_id=0x203, data=data, is_extended_id=False, is_rx=False) #ID is 0x203 for BCM pump, found through .dbc file
             self.bus.send(message)
             time.sleep(0.2)
 
@@ -45,7 +44,7 @@ class Cantroller:
         while self.running:
             raw_value = self.encode_signal(self.ptn_power, 1, 0, 100)
             data = [raw_value, 0, 0xC8, 0x01, 0, 0, 0, 0]
-            message = can.Message(arbitration_id=0x204, data=data, is_extended_id=False, is_rx=False) #ID is 0x204 for PTN pump
+            message = can.Message(arbitration_id=0x204, data=data, is_extended_id=False, is_rx=False) #ID is 0x204 for PTN pump, found through .dbc file
             self.bus.send(message)
             time.sleep(0.2)
 
@@ -103,13 +102,19 @@ if __name__ == '__main__':
     controller.connect_to_instance()
     controller.start()
 
+
     time.sleep(3)
-    controller.set_bcm_power(75)
-    controller.set_ptn_power(75)
-    time.sleep(5)
-    print("pump1 (bcm) 40%")
+
+    percent = int(input("enter pump percent"))
+    seconds = int(input("number of seconds"))
+    controller.set_bcm_power(percent)
+    controller.set_ptn_power(percent)
+    print(f"pumps to {percent}%")
     
+    time.sleep(seconds)
+    print("pumps to 0%")    
+    controller.set_bcm_power(0)
+    controller.set_ptn_power(0)
 
     controller.stop()
     controller.shutdown()
-

@@ -39,6 +39,16 @@ class PumpControlApp(QMainWindow):
         self.test_case_checkbox.setChecked(False)
         self.test_case_checkbox.stateChanged.connect(lambda state: self.update_boolean('test_case_enabled', state))
 
+        # Input pump percent (default is 75)
+        self.pump_input = QDoubleSpinBox(self)
+        self.pump_input.setSingleStep(1)       
+        self.pump_input.valueChanged.connect(lambda value: self.update_variable("self.pump_power", value))
+
+        # Input COM port (default is COM6)
+        self.com_entry = QLineEdit()
+        self.com_entry.setPlaceholderText("Enter COM port") 
+        self.com_entry.textChanged.connect(lambda value: self.update_variable("self.COM_port", value))
+
     def initialize(self):
         self.setWindowTitle("Manifold Durability Cyclic Pressure Test")
         self.setGeometry(100, 100, 800, 200)
@@ -78,6 +88,9 @@ class PumpControlApp(QMainWindow):
         self.fluid_remaining_time = 0
         self.chamber_remaining_time = 0
         self.cycle_log_count = 0
+        self.curr_psi_array = []
+        self.pump_power = 75
+        self.COM_port = 'COM6'
 
         self.initialize_widgets()
         self.initialize_layouts()  
@@ -133,6 +146,7 @@ class PumpControlApp(QMainWindow):
         self.col1_layout = QVBoxLayout()
         self.col1_layout.addWidget(self._test_param_title)
         self.col1_layout.addWidget(self.test_case_checkbox)
+        self.col1_layout.addWidget(self.pump_input)
         self.col1_layout.addWidget(self._total_test_box)
         self.col1_layout.addWidget(self._fluid_cycle_box)
         self.col1_layout.addWidget(self._chamber_cycle_box)
@@ -294,22 +308,22 @@ class PumpControlApp(QMainWindow):
         cycle_input.setSingleStep(0.25)
         cycle_input.setMaximum(999999.99)
         cycle_input.valueChanged.connect(lambda value: self.update_variable("pressure_num_cycles", value))
-        layout.addWidget(cycle_input, 1, 0)
-        layout.addWidget(QLabel("cycles"), 1, 1)
+        layout.addWidget(cycle_input, 2, 0)
+        layout.addWidget(QLabel("cycles"), 2, 1)
 
         # Create min psi
         min_psi = QDoubleSpinBox(self)
         min_psi.setSingleStep(1)       
         min_psi.valueChanged.connect(lambda value: self.update_variable("pressure_min_psi", value))
-        layout.addWidget(QLabel("min PSI"), 2, 0)
-        layout.addWidget(min_psi, 2, 1)
+        layout.addWidget(QLabel("min PSI"), 3, 0)
+        layout.addWidget(min_psi, 3, 1)
 
         # Create max psi
         max_psi = QDoubleSpinBox(self)
         max_psi.setSingleStep(1)       
         max_psi.valueChanged.connect(lambda value: self.update_variable("pressure_max_psi", value))
-        layout.addWidget(QLabel("max PSI"), 3, 0)
-        layout.addWidget(max_psi, 3, 1)
+        layout.addWidget(QLabel("max PSI"), 4, 0)
+        layout.addWidget(max_psi, 4, 1)
 
         self._pressure_cycle_box.setLayout(layout)
 
@@ -434,7 +448,7 @@ class PumpControlApp(QMainWindow):
             self._sensors_list = new_sensor_box
             self.col3_layout.addWidget(self._sensors_list)
         else: 
-            print("Error: FlexLogger did not respond")
+            print("Error: No running FlexLogger detected.  If FlexLogger is running, this might mean the automation server is not enabled.  To turn on the automation server, see the General tab of the Preferences in FlexLogger")
             self.create_dialogue_ok_box("Connection Error", "Could not connect to FlexLogger!")
             
     def connect_canbus(self):
@@ -460,7 +474,7 @@ class PumpControlApp(QMainWindow):
         print("Connecting to Julabo")
 
         try:
-            self._julabo = JULABO('COM6', baud=4800) #change based on COM port
+            self._julabo = JULABO(self.COM_port, baud=4800) #change based on COM port
 
             # Test if communication works
             response = self._julabo.get_version()
@@ -468,11 +482,11 @@ class PumpControlApp(QMainWindow):
                 print(f"Connected to Julabo Version: {response}")
                 self.julabo_connected = True
             else:
-                print("Error: Julabo did not respond")
+                print("Error: Julabo did not respond. Check COM port.")
                 self.julabo_connected = False
 
         except serial.SerialException:
-            print("Error: Could not open COM. Check code for chosen COM port.")
+            print("Error: Could not open COM. Check COM port.")
             self.julabo_connected = False
 
 
@@ -584,7 +598,6 @@ class PumpControlApp(QMainWindow):
                        
             print("updated cycle status")
 
-
     def calculate_period(self, cycle_period, cycle_min, cycle_max):
         """(STATIC) Create lists for x-axis and y-axis based on period, min, and max"""
         x = []  # Start with an empty list
@@ -633,7 +646,7 @@ class PumpControlApp(QMainWindow):
             if not self.resume_cycle_enabled:
                 self.fluid_cycle_count = 0
                 self.chamber_cycle_count = 0
-                self.pressure_drop_count = 0 # For pressure drop check
+                self.pressure_drop_count = [0] # For pressure drop check
                 self.pressure_drop_debug = 0
 
             # Initialize fluid cycling timer
@@ -732,6 +745,10 @@ class PumpControlApp(QMainWindow):
                 layout.addWidget(QLabel(f"{str(sen)}:"), row, 0)
                 layout.addWidget(sensor_label, row, 1)
 
+                # Store count of pressure sensors
+                if "psi" in sen.lower():
+                    self.curr_psi_array.append(0)
+
         # Return created sensor widget layout 
         sensor_box.setLayout(layout)
         return sensor_box
@@ -739,8 +756,8 @@ class PumpControlApp(QMainWindow):
     def update_sensor_values(self):
         """(DYNAMIC) Function connected to timer to append sensor values to dict & log to file"""
 
-        for sensor, data in self.sensor_data.items():
-            new_value = self._flex.read_sensor_val(sensor)  # Read latest sensor value
+        for sen, data in self.sensor_data.items():
+            new_value = self._flex.read_sensor_val(sen)  # Read latest sensor value
             
             try:
                 new_value = float(new_value)  # Ensure it's a valid float
@@ -751,7 +768,7 @@ class PumpControlApp(QMainWindow):
                     time_index = data["time_counter"] * (self.timer_ms / 3600000)  # X-axis value
                     data["time_counter"] += 1  # Increment array counter
 
-                    # Append new value and time index (keep 200 most recent)
+                    # Append new value and time index (keep 100 most recent)
                     data["values"].append(new_value)
                     data["x_values"].append(time_index)
 
@@ -760,15 +777,21 @@ class PumpControlApp(QMainWindow):
                         data["x_values"].pop(0)
                     
                     # inlet pressure drop check
-                    if "psi" in sensor.lower() and "inlet" in sensor.lower():
-                        curr_pressure = new_value # Sets current value to sensor reading
-                        if curr_pressure < 30: # if current pressure < max psi add to count -8 for range
-                            self.pressure_drop_count +=1
+                    if "psi" in sen.lower():
+                        pressure_sensor_index = 0
+                        # Selects the current pressure sensor by checking if the name includes the number     
+                        for sen_num in len(self.curr_psi_array): 
+                            if sen_num in sen.lower():
+                                pressure_sensor_index = sen_num
+
+                        self.curr_psi_array[pressure_sensor_index] = new_value # Sets current value to sensor reading
+                        if self.curr_psi_array[pressure_sensor_index] < 30: # if current pressure < max psi add to count -8 for range
+                            self.pressure_drop_count[pressure_sensor_index] +=1
                         else:                                     # if not, reset count
-                            self.pressure_drop_count = 0
+                            self.pressure_drop_count[pressure_sensor_index] = 0
                         
-                        print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
-                        if self.pressure_drop_count > 100:
+                        print(f"Pressure drop count {pressure_sensor_index}: {self.pressure_drop_count[pressure_sensor_index]}") # Debug statement
+                        if self.pressure_drop_count[pressure_sensor_index] > 100:
                             print("Pressure drop detected, test crashed")
                             self._test_active = False
                             self.create_crash_file()
@@ -776,7 +799,7 @@ class PumpControlApp(QMainWindow):
                             
 
             except ValueError:
-                print(f"Warning: Non-numeric value received for {sensor}: {new_value}")
+                print(f"Warning: Non-numeric value received for {sen}: {new_value}")
 
     def get_timestamp(self):
         """(DYNAMIC) Return the current timestamp as a filename-safe formatted string"""
@@ -887,13 +910,13 @@ class PumpControlApp(QMainWindow):
         
         # Initial sequence to let test warm up
         if self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(60)
-            self._cantroller.set_ptn_power(60)
+            self._cantroller.set_bcm_power(self.pump_power)
+            self._cantroller.set_ptn_power(self.pump_power)
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(75)
-            self._cantroller.set_ptn_power(75)
+            self._cantroller.set_bcm_power(self.pump_power)
+            self._cantroller.set_ptn_power(self.pump_power)
             time.sleep(4)
 
             self._cantroller.set_bcm_power(0)
@@ -906,7 +929,7 @@ class PumpControlApp(QMainWindow):
             self.cycle_log_count += 1
             print(f"Cycle Log #: {self.cycle_log_count}")
 
-            if self.cycle_log_count > 16000:
+            if self.cycle_log_count > 16394:
                 self.create_log_file(self.log_input_name)
                 self.cycle_log_count = 0
                 
@@ -945,7 +968,6 @@ class PumpControlApp(QMainWindow):
         self.last_chamber_time = time.time()
         self.chamber_cycle_count+=1
         self.chamber_cycle_count_label.setText(f"Chamber Cycle Count: {self.chamber_cycle_count}/{self.chamber_num_cycles}")
-        
 
     def stop_test(self):
         """(STATIC) Stop moving components of test"""
