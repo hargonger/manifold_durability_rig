@@ -89,7 +89,7 @@ class PumpControlApp(QMainWindow):
         self.chamber_remaining_time = 0
         self.cycle_log_count = 0
         self.curr_psi_array = []
-        self.pump_power = 75
+        self.pump_power = 70
         self.COM_port = 'COM6'
 
         self.initialize_widgets()
@@ -641,15 +641,17 @@ class PumpControlApp(QMainWindow):
             self._test_active = False
             self.pressure_cycle_count = 0
             self.cycle_log_count = 0
+            self.fluid_remaining_time = self.fluid_period*3600
+            self.chamber_remaining_time = self.chamber_period*3600
 
-            # Resuming test
+            # Resuming test 
             if not self.resume_cycle_enabled:
                 self.fluid_cycle_count = 0
                 self.chamber_cycle_count = 0
-                self.pressure_drop_count = [0] # For pressure drop check
+                self.pressure_drop_count = 0 # For pressure drop check
                 self.pressure_drop_debug = 0
 
-            # Initialize fluid cycling timer
+            # Initialize fluid cycling timer    
             self._fluid_timer = PausableTimer(self.fluid_period*3600, self.set_julabo_temp)
             self._chamber_timer = PausableTimer(self.chamber_period*3600, self.set_chamber_temp)
 
@@ -777,21 +779,15 @@ class PumpControlApp(QMainWindow):
                         data["x_values"].pop(0)
                     
                     # inlet pressure drop check
-                    if "psi" in sen.lower():
-                        pressure_sensor_index = 0
-                        # Selects the current pressure sensor by checking if the name includes the number     
-                        for sen_num in len(self.curr_psi_array): 
-                            if sen_num in sen.lower():
-                                pressure_sensor_index = sen_num
-
-                        self.curr_psi_array[pressure_sensor_index] = new_value # Sets current value to sensor reading
-                        if self.curr_psi_array[pressure_sensor_index] < 30: # if current pressure < max psi add to count -8 for range
-                            self.pressure_drop_count[pressure_sensor_index] +=1
+                    if "pressure1" in sen.lower():
+                        curr_pressure = new_value # Sets current value to sensor reading
+                        if curr_pressure < 30: # if current pressure < max psi add to count -8 for range
+                            self.pressure_drop_count += 1
                         else:                                     # if not, reset count
-                            self.pressure_drop_count[pressure_sensor_index] = 0
+                            self.pressure_drop_count = 0
                         
-                        print(f"Pressure drop count {pressure_sensor_index}: {self.pressure_drop_count[pressure_sensor_index]}") # Debug statement
-                        if self.pressure_drop_count[pressure_sensor_index] > 100:
+                        print(f"Pressure drop count: {self.pressure_drop_count}") # Debug statement
+                        if self.pressure_drop_count > 100:
                             print("Pressure drop detected, test crashed")
                             self._test_active = False
                             self.create_crash_file()
