@@ -89,7 +89,7 @@ class PumpControlApp(QMainWindow):
         self.chamber_remaining_time = 0
         self.cycle_log_count = 0
         self.curr_psi_array = []
-        self.pump_power = 70
+        self.pump_power = 80
         self.COM_port = 'COM6'
 
         self.initialize_widgets()
@@ -117,8 +117,11 @@ class PumpControlApp(QMainWindow):
         self._flexlogger_button = self.create_button("Connect FlexLogger", self.connect_flexlogger)
         self._flexlogger_conn_status = self.create_connection_status_label(self.flexlogger_connected)
 
-        self._canbus_button = self.create_button("Connect canbus", self.connect_canbus)
-        self._canbus_conn_status = self.create_connection_status_label(self.canbus_connected)
+        self._canbus_main_button = self.create_button("Connect MAIN canbus", self.connect_main_canbus)
+        self._canbus_main_conn_status = self.create_connection_status_label(self.canbus_connected)
+
+        self._canbus_mega_button = self.create_button("Connect MEGATRON canbus", self.connect_mega_canbus)
+        self._canbus_mega_conn_status = self.create_connection_status_label(self.canbus_connected)
 
         self._julabo_button = self.create_button("Connect julabo", self.connect_julabo)       
         self._julabo_conn_status = self.create_connection_status_label(self.julabo_connected) 
@@ -161,12 +164,14 @@ class PumpControlApp(QMainWindow):
         self.conn_layout = QGridLayout()
         self.conn_layout.addWidget(self._flexlogger_button, 1, 0)
         self.conn_layout.addWidget(self._flexlogger_conn_status, 1, 1)
-        self.conn_layout.addWidget(self._canbus_button, 2, 0)
-        self.conn_layout.addWidget(self._canbus_conn_status, 2, 1)
-        self.conn_layout.addWidget(self._julabo_button, 3, 0)
-        self.conn_layout.addWidget(self._julabo_conn_status, 3, 1)
-        self.conn_layout.addWidget(self._graph_1, 4, 0)
-        self.conn_layout.addWidget(self._graph_2, 4, 1)
+        self.conn_layout.addWidget(self._canbus_main_button, 2, 0)
+        self.conn_layout.addWidget(self._canbus_main_conn_status, 2, 1)
+        self.conn_layout.addWidget(self._canbus_mega_button, 3, 0)
+        self.conn_layout.addWidget(self._canbus_mega_conn_status, 3, 1)
+        self.conn_layout.addWidget(self._julabo_button, 4, 0)
+        self.conn_layout.addWidget(self._julabo_conn_status, 4, 1)
+        self.conn_layout.addWidget(self._graph_1, 5, 0)
+        self.conn_layout.addWidget(self._graph_2, 5, 1)
         self.col2_layout.addLayout(self.conn_layout)
         self.button_layout = QGridLayout()
         self.button_layout.addWidget(self._start_resume_button, 1, 0)
@@ -451,20 +456,50 @@ class PumpControlApp(QMainWindow):
             print("Error: No running FlexLogger detected.  If FlexLogger is running, this might mean the automation server is not enabled.  To turn on the automation server, see the General tab of the Preferences in FlexLogger")
             self.create_dialogue_ok_box("Connection Error", "Could not connect to FlexLogger!")
             
-    def connect_canbus(self):
+    def connect_main_canbus(self):
         print("Connecting CANBUS")
-        self._cantroller = Cantroller()
+        self._cantroller = Cantroller(megatron=False)
         self.canbus_connected = self._cantroller.connect_to_instance()
 
         if self.canbus_connected:
             # Create a new label
-            print("Connected to CANBUS successfully")
+            print("Connected to MAIN CANBUS successfully")
             new_flex_status = QLabel("Connected")
             # Replace label widget
-            self.conn_layout.removeWidget(self._canbus_conn_status)
-            self._canbus_conn_status.deleteLater()
-            self._canbus_conn_status = new_flex_status
-            self.conn_layout.addWidget(self._canbus_conn_status, 2, 1)
+            self.conn_layout.removeWidget(self._canbus_main_conn_status)
+            self._canbus_main_conn_status.deleteLater()
+            self._canbus_main_conn_status = new_flex_status
+            self.conn_layout.addWidget(self._canbus_main_conn_status, 2, 1)
+            # Remove other button
+            try:
+                self.conn_layout.removeWidget(self._canbus_mega_button)
+                self._canbus_mega_button.deleteLater()
+            except RuntimeError:
+                pass
+        else:
+            print("Error: CANBUS did not respond")
+            self.create_dialogue_ok_box("Connection Error", "Could not connect to CANBUS!")
+
+    def connect_mega_canbus(self):
+        print("Connecting CANBUS")
+        self._cantroller = Cantroller(megatron=True)
+        self.canbus_connected = self._cantroller.connect_to_instance()
+
+        if self.canbus_connected:
+            # Create a new label
+            print("Connected to MEGATRON CANBUS successfully")
+            new_flex_status = QLabel("Connected")
+            # Replace label widget
+            self.conn_layout.removeWidget(self._canbus_mega_conn_status)
+            self._canbus_mega_conn_status.deleteLater()
+            self._canbus_mega_conn_status = new_flex_status
+            self.conn_layout.addWidget(self._canbus_mega_conn_status, 3, 1)
+            # Remove other button
+            try:
+                self.conn_layout.removeWidget(self._canbus_main_button)
+                self._canbus_main_button.deleteLater()
+            except RuntimeError:
+                pass
         else:
             print("Error: CANBUS did not respond")
             self.create_dialogue_ok_box("Connection Error", "Could not connect to CANBUS!")
@@ -906,17 +941,14 @@ class PumpControlApp(QMainWindow):
         
         # Initial sequence to let test warm up
         if self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(self.pump_power)
-            self._cantroller.set_ptn_power(self.pump_power)
+            self._cantroller.set_pump_power(self.pump_power)
             time.sleep(2)
 
         while self._test_active and self.pressure_cycle_count < self.pressure_num_cycles:
-            self._cantroller.set_bcm_power(self.pump_power)
-            self._cantroller.set_ptn_power(self.pump_power)
+            self._cantroller.set_pump_power(self.pump_power)
             time.sleep(4)
 
-            self._cantroller.set_bcm_power(0)
-            self._cantroller.set_ptn_power(0)
+            self._cantroller.set_pump_power(0)
             time.sleep(1.27)  
 
             #print(f"Julabo temp: {self._julabo.get_temperature()}") # Debug statement

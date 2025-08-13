@@ -3,7 +3,7 @@ import threading
 import time
 
 class Cantroller:
-    def __init__(self):
+    def __init__(self, megatron):
         
         # Default values
         self.bcm_power = 0
@@ -15,11 +15,18 @@ class Cantroller:
         self.bcm_thread = None
         self.ptn_thread = None
         self.pump2_thread = None
+
+        self.megatron = megatron
+
+        if self.megatron:
+            self.channel = 1
+        else:
+            self.channel = 0
     
-    def connect_to_instance(self, channel=0, bitrate=500000):
+    def connect_to_instance(self, bitrate=500000):
         """ Creates CANBUS connection between pump and computer """
         try:
-            self.bus = can.interface.Bus(interface='vector', channel=channel, bitrate=bitrate, receive_own_messages=True)
+            self.bus = can.interface.Bus(interface='vector', channel=self.channel, bitrate=bitrate, receive_own_messages=True)
             return True
         except can.CanInitializationError:
             print("Could not connect to CANBUS")
@@ -48,7 +55,7 @@ class Cantroller:
             self.bus.send(message)
             time.sleep(0.2)
 
-    def _send_pump2_command(self):
+    def _send_pump_command(self):
         """ Translate raw value to sendable 'message' to emp pump """
         while self.running:
             raw_value = self.encode_signal(self.pump2_power, 0.5, 0, 200)
@@ -62,11 +69,10 @@ class Cantroller:
         if not self.running:
             self.running = True
             self.bcm_thread = threading.Thread(target=self._send_bcm_command, daemon=True)
-            self.ptn_thread = threading.Thread(target=self._send_ptn_command, daemon=True)
-            #self.pump2_thread = threading.Thread(target=self._send_pump2_command, daemon=True)
             self.bcm_thread.start()
-            self.ptn_thread.start()
-            #self.pump2_thread.start()
+            if not self.megatron:
+                self.ptn_thread = threading.Thread(target=self._send_ptn_command, daemon=True)
+                self.ptn_thread.start()
 
     def stop(self):
         """ Stops threads """
@@ -85,17 +91,13 @@ class Cantroller:
         self.bus.shutdown()
         print("CAN bus shutdown complete.")
 
-    def set_bcm_power(self, value):
+    def set_pump_power(self, value):
         self.bcm_power = value
         print(f"Updated 'BCM Work Percent' to {value}%")
+        if not self.megatron:
+            self.ptn_power = value
+            print(f"Updated 'PTN Work Percent' to {value}%")
 
-    def set_ptn_power(self, value):
-        self.ptn_power = value
-        print(f"Updated 'PTN Work Percent' to {value}%")
-
-    def set_pump2_power(self, value):
-        self.pump2_power = value
-        print(f"Updated 'PUMP2 Motor Speed' Command to {value}%")
 
 if __name__ == '__main__':
     controller = Cantroller()
