@@ -39,16 +39,6 @@ class PumpControlApp(QMainWindow):
         self.test_case_checkbox.setChecked(False)
         self.test_case_checkbox.stateChanged.connect(lambda state: self.update_boolean('test_case_enabled', state))
 
-        # Input pump percent (default is 75)
-        self.pump_input = QDoubleSpinBox(self)
-        self.pump_input.setSingleStep(1)       
-        self.pump_input.valueChanged.connect(lambda value: self.update_variable("self.pump_power", value))
-
-        # Input COM port (default is COM6)
-        self.com_entry = QLineEdit()
-        self.com_entry.setPlaceholderText("Enter COM port") 
-        self.com_entry.textChanged.connect(lambda value: self.update_variable("self.COM_port", value))
-
     def initialize(self):
         self.setWindowTitle("Manifold Durability Cyclic Pressure Test")
         self.setGeometry(100, 100, 800, 200)
@@ -60,6 +50,7 @@ class PumpControlApp(QMainWindow):
         self.test_case_enabled = False
         self.resume_cycle_enabled = False
         self.initial_start = False
+        self.megatron_enabled = False #bool for pump box (second level)
 
         # Declare connections
         self.flexlogger_connected = False
@@ -114,16 +105,16 @@ class PumpControlApp(QMainWindow):
         # Column 2 widgets
         self._main_title = self.create_title_label("AUTOMATED MANIFOLD TESTING")
 
-        self._flexlogger_button = self.create_button("Connect FlexLogger", self.connect_flexlogger)
+        self._flexlogger_button = self.create_button("CONNECT FLEXLOGGER", self.connect_flexlogger)
         self._flexlogger_conn_status = self.create_connection_status_label(self.flexlogger_connected)
 
-        self._canbus_main_button = self.create_button("Connect MAIN canbus", self.connect_main_canbus)
+        self._canbus_main_button = self.create_button("CONNECT MAIN CANBUS", self.connect_main_canbus)
         self._canbus_main_conn_status = self.create_connection_status_label(self.canbus_connected)
 
-        self._canbus_mega_button = self.create_button("Connect MEGATRON canbus", self.connect_mega_canbus)
+        self._canbus_mega_button = self.create_button("CONNECT MEGATRON CANBUS", self.connect_mega_canbus)
         self._canbus_mega_conn_status = self.create_connection_status_label(self.canbus_connected)
 
-        self._julabo_button = self.create_button("Connect julabo", self.connect_julabo)       
+        self._julabo_button = self.create_button("CONNECT JULABO", self.connect_julabo)       
         self._julabo_conn_status = self.create_connection_status_label(self.julabo_connected) 
 
         self._graph_1 = self.create_graph("Temperature Cycles", "Hour", "Temperature (C)")
@@ -149,7 +140,6 @@ class PumpControlApp(QMainWindow):
         self.col1_layout = QVBoxLayout()
         self.col1_layout.addWidget(self._test_param_title)
         self.col1_layout.addWidget(self.test_case_checkbox)
-        self.col1_layout.addWidget(self.pump_input)
         self.col1_layout.addWidget(self._total_test_box)
         self.col1_layout.addWidget(self._fluid_cycle_box)
         self.col1_layout.addWidget(self._chamber_cycle_box)
@@ -430,14 +420,14 @@ class PumpControlApp(QMainWindow):
     def connect_flexlogger(self):
         """Attached to flexlogger button, creates an instance and starts updating sensor values"""
 
-        print("Connecting FlexLogger")  
+        print("Connecting FlexLogger...")  
         self._flex = FlexLoggerInterface()
         self.flexlogger_connected = self._flex.connect_to_instance()
         #self.timer.timeout.connect(self.check_connections)
         
         if self.flexlogger_connected:
             # Create a new label
-            print("Connected to FlexLogger successfully")
+            print("Connected to FlexLogger successfully!")
             new_flex_status = QLabel("Connected")
             # Replace label widget
             self.conn_layout.removeWidget(self._flexlogger_conn_status)
@@ -457,13 +447,13 @@ class PumpControlApp(QMainWindow):
             self.create_dialogue_ok_box("Connection Error", "Could not connect to FlexLogger!")
             
     def connect_main_canbus(self):
-        print("Connecting CANBUS")
+        print("Connecting MAIN CANBUS...")
         self._cantroller = Cantroller(megatron=False)
         self.canbus_connected = self._cantroller.connect_to_instance()
 
         if self.canbus_connected:
             # Create a new label
-            print("Connected to MAIN CANBUS successfully")
+            print("Connected to MAIN CANBUS successfully!")
             new_flex_status = QLabel("Connected")
             # Replace label widget
             self.conn_layout.removeWidget(self._canbus_main_conn_status)
@@ -481,13 +471,13 @@ class PumpControlApp(QMainWindow):
             self.create_dialogue_ok_box("Connection Error", "Could not connect to CANBUS!")
 
     def connect_mega_canbus(self):
-        print("Connecting CANBUS")
+        print("Connecting MEGATRON CANBUS...")
         self._cantroller = Cantroller(megatron=True)
         self.canbus_connected = self._cantroller.connect_to_instance()
 
         if self.canbus_connected:
             # Create a new label
-            print("Connected to MEGATRON CANBUS successfully")
+            print("Connected to MEGATRON CANBUS successfully!")
             new_flex_status = QLabel("Connected")
             # Replace label widget
             self.conn_layout.removeWidget(self._canbus_mega_conn_status)
@@ -498,6 +488,11 @@ class PumpControlApp(QMainWindow):
             try:
                 self.conn_layout.removeWidget(self._canbus_main_button)
                 self._canbus_main_button.deleteLater()
+                self.conn_layout.removeWidget(self._julabo_button)
+                self._julabo_button.deleteLater()
+                self.julabo_connected = False
+                self.megatron_enabled = True
+                print("Megatron (Pump Box Second Level) mode activated")
             except RuntimeError:
                 pass
         else:
@@ -506,7 +501,7 @@ class PumpControlApp(QMainWindow):
     
     def connect_julabo(self):
         """Attempt to connect and verify communication with Julabo."""
-        print("Connecting to Julabo")
+        print("Connecting Julabo...")
 
         try:
             self._julabo = JULABO(self.COM_port, baud=4800) #change based on COM port
@@ -624,14 +619,13 @@ class PumpControlApp(QMainWindow):
 
             for sen in self.sensor_data:
                 self.sensor_data[sen]["time_counter"] = (self.fluid_cycle_count - 1) * (self.fluid_period * 3600) + (self.fluid_period * 3600 - self.fluid_remaining_time)
-                print("hi")
 
             self.resume_cycle_enabled = True
                        
         else:
             self.create_dialogue_ok_box("Error", "Profile not generated! Generate profile first.")
                        
-            print("updated cycle status")
+            print("Updated cycle status")
 
     def calculate_period(self, cycle_period, cycle_min, cycle_max):
         """(STATIC) Create lists for x-axis and y-axis based on period, min, and max"""
@@ -663,14 +657,18 @@ class PumpControlApp(QMainWindow):
         """(STATIC) Generate a plot based on enabled cycles"""
         
         if self.create_dialogue_yes_no_box("Confirmation", "Are you sure you want to generate new profile?"):
-            print("generating profile")
+            print("Generating Profile...")
             # Enable bool
             self.profile_generated = True
             self.initial_start = True
             
-            #test case
+            # Test Case Profile
             if self.test_case_enabled:
                 self.test_case() 
+
+            # Megatron
+            if self.megatron_enabled:
+                self.fluid_period = self.chamber_period
 
             # Deactivate and reset test
             self._test_active = False
@@ -848,12 +846,12 @@ class PumpControlApp(QMainWindow):
             self.create_dialogue_ok_box("Warning", "CANBUS not connected!")
             return
         
-        if not self.julabo_connected:
+        if not self.julabo_connected and not self.megatron_enabled:
             self.create_dialogue_ok_box("Warning", "JULABO not connected!")
             return
 
         if self.profile_generated:
-            print("Starting test")
+            print("Starting Test")
             # Activate test bool
             self._test_active = True 
 
@@ -882,12 +880,12 @@ class PumpControlApp(QMainWindow):
         self._test_active = False
         self._fluid_timer.pause()
         self._chamber_timer.pause()
-        print("Pausing test")
+        print("Pausing Test...")
         # Stops the pressure profile (does not reset pressure_cycle_count)
         if hasattr(self, "test_thread") and self.test_thread.is_alive():
             self.test_thread.join()  # Ensure the test thread stops cleanly
-        print("Test paused")
-        self.create_dialogue_ok_box("Test Status", "Test paused!")
+        print("Test Paused")
+        self.create_dialogue_ok_box("Test Status", "Test Paused!")
     
     def create_crash_file(self):
         """"(STATIC) Create a file with status of test on crash as a backup"""
@@ -935,7 +933,8 @@ class PumpControlApp(QMainWindow):
     def run_test_profile(self):
         """(STATIC) Runs the test loop, cycling pumps on and off while test is active."""
         self._cantroller.start()
-        self._julabo.set_power_on()
+        if self.julabo_connected:
+            self._julabo.set_power_on()
         self._fluid_timer.start()
         self._chamber_timer.start()
         
@@ -968,25 +967,26 @@ class PumpControlApp(QMainWindow):
             self._cantroller.stop()
             self._fluid_timer.pause()
             self._chamber_timer.pause()
-            self._julabo.set_power_off()
+            if self.julabo_connected:
+                self._julabo.set_power_off()
         # PUMP PROFILE FINISHED
         else:
             time.sleep(5) # Allow time for clean log finish
             self._test_active = False
             self.stop_test()
             #self.create_dialogue_ok_box("Test Status", "Test is completed!")
-            print("pressure_profile_finished")
+            print("Pressure Profile Finished! Congratulations, you finally made it!")
 
     def set_julabo_temp(self):
         """(DYNAMIC) Function to change temperature of fluid in julabo based on even/odd (called at end of timer)"""
         self.last_fluid_time = time.time()
-
-        if self.fluid_cycle_count % 2 == 0:
-            self._julabo.set_work_temperature(self.fluid_max_temp)
-            print(f"Set julabo temp to max_temp: {self.fluid_max_temp}")
-        else: 
-            self._julabo.set_work_temperature(self.fluid_min_temp)
-            print(f"Set julabo temp to min_temp: {self.fluid_min_temp} ")
+        if self.julabo_connected:
+            if self.fluid_cycle_count % 2 == 0:
+                self._julabo.set_work_temperature(self.fluid_max_temp)
+                print(f"Set julabo temp to max_temp: {self.fluid_max_temp}")
+            else: 
+                self._julabo.set_work_temperature(self.fluid_min_temp)
+                print(f"Set julabo temp to min_temp: {self.fluid_min_temp} ")
 
         self.fluid_cycle_count+=1
         self.fluid_cycle_count_label.setText(f"Fluid Cycle Count: {self.fluid_cycle_count}/{self.fluid_num_cycles}")

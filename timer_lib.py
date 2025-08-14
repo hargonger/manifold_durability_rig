@@ -32,7 +32,6 @@ class PausableTimer:
             if self.timer:  # Check again before restarting
                 self.start()  # Restart the timer
 
-
     def pause(self):
         """Pause the timer and store remaining time."""
         if self.timer:
@@ -55,8 +54,15 @@ class PausableTimer:
             self.timer = None  # Ensure the timer reference is removed
         self.remaining_time = self.interval
         self.paused = False
-        print("Timer stopped.")
+        print("Test stopped")
 
 if __name__ == "__main__":
 
-    print(time.time())
+    # Example usage
+    def update_temperature():
+        print("Updating temperature...")
+
+    timer = PausableTimer(12 * 3600, update_temperature)  
+    timer.start()  # Start the timer
+
+    # You can call `timer.pause()`, `timer.resume()`, and `timer.stop()` as needed.

@@ -74,8 +74,6 @@ class JULABO():
 		"""Get the Julabo software version."""
 		return self.send_command("version")
 
-
-
 	def flush_input_buffer(self):
 		""" Flush the input buffer of the serial port.
 		"""
@@ -86,7 +84,6 @@ class JULABO():
 		response = self.send_command('out_mode_05 %d' % 0)
 		print(f"Command response: {response}")  # Debug
 		#print("1.2") # debug
-
 
 	def set_power_on(self):
 		""" The function turns the power ON.
