@@ -24,12 +24,17 @@ class PumpControlApp(QMainWindow):
                                                      
     def test_case(self):
         self.total_period = 648
-        self.fluid_period = 12 
-        self.fluid_min_temp = -20
-        self.fluid_max_temp = 40
         self.chamber_period = 13.5
         self.chamber_min_temp = -20
         self.chamber_max_temp = 60
+        if not self.megatron_enabled:
+            self.fluid_period = 12 
+            self.fluid_min_temp = -20
+            self.fluid_max_temp = 40
+        else:
+            self.fluid_period = self.chamber_period
+            self.fluid_min_temp = self.chamber_min_temp
+            self.fluid_max_temp = self.chamber_max_temp
         self.pressure_num_cycles = 444000
         self.pressure_max_psi = 35
         self.pressure_min_psi = 0
@@ -527,7 +532,7 @@ class PumpControlApp(QMainWindow):
             self.conn_layout.removeWidget(self._julabo_conn_status)
             self._julabo_conn_status.deleteLater()
             self._julabo_conn_status = new_status_label
-            self.conn_layout.addWidget(self._julabo_conn_status, 3, 1)
+            self.conn_layout.addWidget(self._julabo_conn_status, 4, 1)
         else:
             self.create_dialogue_ok_box("Connection Error", "Could not connect to julabo!")
 
