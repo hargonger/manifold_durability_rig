@@ -2,10 +2,15 @@ from can_controller_lib import Cantroller
 import time
 import sys
 
+def closeEvent(self, event):
+        controller.shutdown()
+        event.accept()  # Proceed with window closing
+
 if __name__ == "__main__":
 
     controller = Cantroller(megatron=1)
     if controller.connect_to_instance():
+        print("Successfully connected to CANBUS")
         pass
     else:
         print("Exiting in 5s...")
@@ -46,14 +51,16 @@ if __name__ == "__main__":
 
     while current_cycle < total_cycles:
 
-        controller.set_bcm_power(percent)
+        controller.set_pump_power(percent)
         print(f"Pumps to {percent}%")
         time.sleep(4)
 
         print("pumps to 0%")    
-        controller.set_bcm_power(0)
+        controller.set_pump_power(0)
         time.sleep(1.27)
         current_cycle+=1
-
+    
     controller.stop()
     controller.shutdown()
+
+    
